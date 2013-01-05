@@ -51,7 +51,7 @@ class CallbackHandler(webapp2.RequestHandler):
 			credentials = flow.step2_exchange(self.request.params)
 			StorageByKeyName(CredentialsModel, USER_AGENT,
 				'credentials').locked_put(credentials)
-			self.redirect('/')
+			self.redirect('/api?q=berkeley')
 		else:
 			raise('unable to obtain OAuth 2.0 credentials')
 
