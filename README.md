@@ -1,5 +1,7 @@
 # Developing
 
+Here are some details about developing the Geomancer API.
+
 ## Getting the code
 
 Make sure you have Git installed, and then from the command line:
