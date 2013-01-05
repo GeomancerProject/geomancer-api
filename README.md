@@ -30,3 +30,11 @@ $ dev_appserver.py --clear_search_index --high_replication --use_sqlite -c .
 ```
 
 Boom! It's now running locally at [http://localhost:8080](http://localhost:8080) and you get an admin console at [http://localhost:8080/_ah/admin](http://localhost:8080/_ah/admin).
+
+## Authentication
+
+Geomancer rides on Google APIs (e.g., Prediction) and it needs to bootstrapped with credentials by accessing [http://localhost:8080/oauth/auth](http://localhost:8080/oauth/auth). Make sure you login as administrator and then click "Allow access". 
+
+When that's done, you can hit the API!
+
+[http://localhost:8080/api?q=berkeley](http://localhost:8080/api?q=berkeley)
