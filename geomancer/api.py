@@ -17,6 +17,9 @@ def georeference(name, credentials=None):
 		parts=parts, georefs=georefs)
 
 class ApiHandler(webapp2.RequestHandler):
+    def post(self):
+        self.get()
+
     def get(self):
     	credentials = StorageByKeyName(CredentialsModel, 'geomancer-api/1.0', 
     		'credentials').locked_get()
@@ -30,7 +33,40 @@ class ApiHandler(webapp2.RequestHandler):
     		loc.put()
     	self.response.out.write(util.dumps(loc))
 
-handler = webapp2.WSGIApplication([('/api', ApiHandler)], debug=True)
+class StubHandler(webapp2.RequestHandler):
+    STUB = {
+      "locality":{
+        "original":"Berkeley",
+        "normalized":"berkeley"
+      },
+      "georefs":[
+        {
+          "feature":{                  
+            "type": "Feature",
+            "bbox": [-180.0, -90.0, 180.0, 90.0],
+            "geometry": { 
+              "type": "Point",  
+              "coordinates": [100.0, 0.0] 
+            }
+          },
+          "uncertainty": 100
+        }
+      ]
+    }
+
+    def post(self):
+        self.get()
+
+    def get(self):
+        name = self.request.get('q')
+        stub = self.STUB
+        stub['locality']['original'] = name
+        stub['locality']['normalized'] = name.lower().strip()
+        self.response.out.write(util.dumps(stub))        
+
+handler = webapp2.WSGIApplication([
+    ('/api/georef', ApiHandler),
+    ('/api/georef/stub', StubHandler)], debug=True)
          
 def main():
     run_wsgi_app(handler)

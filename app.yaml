@@ -9,7 +9,7 @@ builtins:
 
 handlers:
 
-- url: /api
+- url: /api/georef.*
   script: geomancer.api.handler
 
 - url: /oauth/.*
