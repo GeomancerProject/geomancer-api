@@ -35,7 +35,7 @@ def loctype(name, credentials=None, model='loctype'):
 	payload = {"input": {"csvInstance": [name]}}
 	http = credentials.authorize(httplib2.Http())
 	service = build('prediction', 'v1.5', http=http)
-	resp = service.trainedmodels().predict(id=model,body=payload).execute()
+	resp = service.trainedmodels().predict(id=model, body=payload).execute()
 	prediction = resp['outputLabel']
 	scores = format(resp['outputMulti'])
 	results = [prediction, scores]

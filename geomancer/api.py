@@ -7,14 +7,15 @@ from oauth2client.appengine import CredentialsModel
 from oauth2client.appengine import StorageByKeyName
 
 def georeference(name, credentials=None):
-	loctype, scores = predict.loctype(name, credentials=credentials)
-	parts = parse.parts(name, loctype)
-	parts['geocodes'] = {}
-	for feature in parts['features']:
-		parts['geocodes'][feature] = geocode.lookup(feature)
-	georefs = error.calculate(parts)
-	return Locality(id=Locality.normalize(name), name=name, loctype=loctype, 
-		parts=parts, georefs=georefs)
+    loctype, scores = predict.loctype(name, credentials=credentials)
+    parts = parse.parts(name, loctype)
+    logging.info(parts)
+    parts['geocodes'] = {}
+    for feature in parts['features']:
+        parts['geocodes'][feature] = geocode.lookup(feature)
+    georefs = error.calculate(parts)
+    return Locality(id=Locality.normalize(name), name=name, loctype=loctype, 
+        parts=parts, georefs=georefs)
 
 class ApiHandler(webapp2.RequestHandler):
     def post(self):
