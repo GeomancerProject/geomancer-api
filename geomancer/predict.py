@@ -25,7 +25,7 @@ def format(jsonscores):
 		scores[label] = score
 	return scores
 
-def loctype(name, credentials=None, model='biogeomancer/locs.csv'):
+def loctype(name, credentials=None, model='loctype'):
 	"Retutn [type, scores] for supplied locality name."
 	loctype = LocType.get_by_name(name)
 	if loctype:
@@ -34,7 +34,7 @@ def loctype(name, credentials=None, model='biogeomancer/locs.csv'):
 		return ['f', []]		
 	payload = {"input": {"csvInstance": [name]}}
 	http = credentials.authorize(httplib2.Http())
-	service = build('prediction', 'v1.4', http=http)
+	service = build('prediction', 'v1.5', http=http)
 	resp = service.trainedmodels().predict(id=model,body=payload).execute()
 	prediction = resp['outputLabel']
 	scores = format(resp['outputMulti'])

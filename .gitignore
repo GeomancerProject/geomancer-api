@@ -33,4 +33,6 @@ nosetests.xml
 .project
 .pydevproject
 *.sublime-*
+
 client_secrets.json
+googlekey
