@@ -1,0 +1,7 @@
+code,name,forms,tometers
+MI,mi,"mi, mile, miles",1609.3445
+M,m,"m, meter, metre, meters, metres",1
+FT,ft,"ft, foot, feet",0.3048
+YD,yds,"yds, yard, yards",0.91440276
+KM,km,"km, kilometer, kilometre, kilometers, kilometres",1000
+NM,nm,"nm, nmi, nmile, nmiles, nautm, nautmi, nautmile, nautmiles, nauticalm, nauticalmi, nauticalmile, nauticalmiles",1852
