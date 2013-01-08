@@ -1,24 +1,6 @@
-#!/usr/bin/env python
-
-# Copyright 2011 University of California at Berkeley
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-# http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
-__author__ = "Aaron Steele and John Wieczorek"
-
-import logging
-from point import *
-from optparse import OptionParser
+#import logging
+from geomancer.parse.point import *
+#from optparse import OptionParser
 import math
 
 class BoundingBox(object):
@@ -282,57 +264,57 @@ def great_circle_midpoint(p0,p1):
     lng3 = lng1 + math.atan2(by, math.cos(lat1) + bx)
     return Point(math.degrees(lng3),math.degrees(lat3))
 
-def _getoptions():
-    """Parses command line options and returns them."""
-    parser = OptionParser()
-    parser.add_option("-c", "--command", dest="command",
-                      help="Command to run",
-                      default=None)
-    parser.add_option("-1", "--bb1", dest="bb1",
-                      help="NW corner of one bounding box",
-                      default=None)
-    parser.add_option("-2", "--bb2", dest="bb2",
-                      help="NW corner of second bounding box",
-                      default=None)
-    return parser.parse_args()[0]
+# def _getoptions():
+#     """Parses command line options and returns them."""
+#     parser = OptionParser()
+#     parser.add_option("-c", "--command", dest="command",
+#                       help="Command to run",
+#                       default=None)
+#     parser.add_option("-1", "--bb1", dest="bb1",
+#                       help="NW corner of one bounding box",
+#                       default=None)
+#     parser.add_option("-2", "--bb2", dest="bb2",
+#                       help="NW corner of second bounding box",
+#                       default=None)
+#     return parser.parse_args()[0]
 
-def main():
-    logging.basicConfig(level=logging.DEBUG)
-    options = _getoptions()
-    command = options.command.lower()
+# def main():
+#     logging.basicConfig(level=logging.DEBUG)
+#     options = _getoptions()
+#     command = options.command.lower()
     
-    logging.info('COMMAND %s' % command)
+#     logging.info('COMMAND %s' % command)
 
-    if command=='help':
-        print 'syntax: -c intersection -1 w_lng,n_lat|e_lng,s_lat -2 w_lng,n_lat|e_lng,s_lat'
-        return
+#     if command=='help':
+#         print 'syntax: -c intersection -1 w_lng,n_lat|e_lng,s_lat -2 w_lng,n_lat|e_lng,s_lat'
+#         return
 
-    if command=='intersect':
-        if options.bb1 is None:
-            print 'bb1 argument missing'
-            return
-        if options.bb2 is None:
-            print 'bb2 argument missing'
-            return
-        nw, se = options.bb1.split('|')
-        w, n = nw.split(',')
-        e, s = se.split(',')
-        pnw=Point(float(w),float(n))
-        pse=Point(float(e),float(s))
-        bb1=BoundingBox(pnw,pse)
+#     if command=='intersect':
+#         if options.bb1 is None:
+#             print 'bb1 argument missing'
+#             return
+#         if options.bb2 is None:
+#             print 'bb2 argument missing'
+#             return
+#         nw, se = options.bb1.split('|')
+#         w, n = nw.split(',')
+#         e, s = se.split(',')
+#         pnw=Point(float(w),float(n))
+#         pse=Point(float(e),float(s))
+#         bb1=BoundingBox(pnw,pse)
 
-        nw, se = options.bb2.split('|')
-        w, n = nw.split(',')
-        e, s = se.split(',')
-        pnw=Point(float(w),float(n))
-        pse=Point(float(e),float(s))
-        bb2=BoundingBox(pnw,pse)
+#         nw, se = options.bb2.split('|')
+#         w, n = nw.split(',')
+#         e, s = se.split(',')
+#         pnw=Point(float(w),float(n))
+#         pse=Point(float(e),float(s))
+#         bb2=BoundingBox(pnw,pse)
         
-        i = bb1.intersection(bb2)
-        if i is None:
-            print 'No intersection'
-        else:
-            print 'nw: %s se: %s' % (i.nw, i.se)
+#         i = bb1.intersection(bb2)
+#         if i is None:
+#             print 'No intersection'
+#         else:
+#             print 'nw: %s se: %s' % (i.nw, i.se)
 
-if __name__ == "__main__":
-    main()
+# if __name__ == "__main__":
+#     main()
