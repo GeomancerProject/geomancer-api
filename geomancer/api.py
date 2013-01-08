@@ -9,7 +9,8 @@ from oauth2client.appengine import StorageByKeyName
 def georeference(name, credentials=None):
     loctype, scores = predict.loctype(name, credentials=credentials)
     parts = parse.parts(name, loctype)
-    logging.info(parts)
+    if len(parts) == 0:
+        return None
     parts['geocodes'] = {}
     for feature in parts['features']:
         parts['geocodes'][feature] = geocode.lookup(feature)
@@ -30,8 +31,11 @@ class ApiHandler(webapp2.RequestHandler):
     	loc = Locality.get_by_name(name)
     	logging.info('LOC %s' % loc)
     	if not loc or loc.georefs is None:
-    		loc = georeference(name, credentials)
-    		loc.put()
+            loc = georeference(name, credentials)
+            if loc:
+                loc.put()
+            else:
+                loc = dict(oops='Unable to georeference %s' % name)
     	self.response.out.write(util.dumps(loc))
 
 class StubHandler(webapp2.RequestHandler):
