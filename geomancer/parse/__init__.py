@@ -1,15 +1,14 @@
-from geomancer.model import Locality
+from geomancer.model import Cache
 from geomancer.parse import core
-from google.appengine.ext import ndb
 
-class LocParts(ndb.Model):
-	results = ndb.JsonProperty()
+class Parts(Cache):
+	pass
 
 def parts(name, loctype):
 	"""Retutn parts dictionary from supplied locality name and type."""
-	locparts = LocParts.get_or_insert(Locality.normalize(name))
-	if locparts.results:
-		return locparts.results	
-	locparts.results = core.parse_loc(name, loctype)
-	locparts.put()
-	return locparts.results
+	parts = Parts.get_or_insert(name)
+	if parts.results:
+		return parts.results	
+	parts.results = core.parse_loc(name, loctype)
+	parts.put()
+	return parts.results

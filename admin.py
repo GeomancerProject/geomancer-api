@@ -38,7 +38,7 @@ class AuthHandler(webapp2.RequestHandler):
 				user_agent=USER_AGENT,
 				access_type = 'offline',
 				approval_prompt='force',
-				redirect_uri=self.request.relative_url('/oauth/callback'))
+				redirect_uri=self.request.relative_url('/admin/oauth/callback'))
 			authorize_url = flow.step1_get_authorize_url()#callback)
 			memcache.set(user.user_id(), pickle.dumps(flow))
 			self.redirect(authorize_url)
@@ -51,14 +51,21 @@ class CallbackHandler(webapp2.RequestHandler):
 			credentials = flow.step2_exchange(self.request.params)
 			StorageByKeyName(CredentialsModel, USER_AGENT,
 				'credentials').locked_put(credentials)
-			self.redirect('/api?q=berkeley')
+			self.redirect('/api/georef?q=berkeley')
 		else:
 			raise('unable to obtain OAuth 2.0 credentials')
 
+class FlushHandler(webapp2.RequestHandler):
+	def get(self):
+		from geomancer.model import Cache, Locality
+		from google.appengine.ext import ndb
+		ndb.delete_multi(Cache.query().fetch(keys_only=True))
+		ndb.delete_multi(Locality.query().fetch(keys_only=True))
 
 handler = webapp2.WSGIApplication(
-	[('/oauth/auth', AuthHandler),
-	('/oauth/callback', CallbackHandler)], 
+	[('/admin/oauth', AuthHandler),
+	('/admin/oauth/callback', CallbackHandler),
+	('/admin/cache/flush', FlushHandler)], 
 	debug=True)
          
 def main():

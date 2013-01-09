@@ -6,14 +6,19 @@ from google.appengine.ext.webapp.util import run_wsgi_app
 from oauth2client.appengine import CredentialsModel
 from oauth2client.appengine import StorageByKeyName
 
+def normalize(name):
+    "Return the normalized version of supplied name."
+    return name.lower().strip()
+
 def georeference(name, credentials=None):
+    name = normalize(name)
     loctype, scores = predict.loctype(name, credentials=credentials)
     parts = parse.parts(name, loctype)
     if len(parts) == 0:
         return None
     parts['geocodes'] = {}
     for feature in parts['features']:
-        parts['geocodes'][feature] = geocode.lookup(feature)
+        parts['geocodes'][feature] = geocode.lookup(normalize(feature))
     georefs = error.calculate(parts)
     return Locality(id=Locality.normalize(name), name=name, loctype=loctype, 
         parts=parts, georefs=georefs)
