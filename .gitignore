@@ -36,3 +36,4 @@ nosetests.xml
 
 client_secrets.json
 googlekey
+datastore
