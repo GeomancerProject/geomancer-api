@@ -1,4 +1,13 @@
 from google.appengine.ext import ndb
+from google.appengine.ext.ndb import polymodel
+
+class Cache(polymodel.PolyModel):
+	results = ndb.JsonProperty()
+
+	@classmethod 
+	def get_or_insert(cls, name):	
+		id = '%s-%s' % (cls._class_name(), name)
+		return super(Cache, cls).get_or_insert(id)
 
 class Locality(ndb.Model):
 	"Models a georeferenced locality."
