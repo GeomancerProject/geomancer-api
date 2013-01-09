@@ -4,8 +4,8 @@ from geomancer.constants import DistanceUnits, Headings
 DEGREE_DIGITS = 7
 
 def truncate(x, digits):
-    """Returns a string representation of x including a number of places to the right of 
-    the decimal equal to digits.
+    """ Returns a string representation of x including a number of places to the 
+        right of the decimal equal to digits.
     
     Arguments:
         x - the input float
@@ -24,7 +24,9 @@ def unitDictionary(tokens):
     i = 0
     while i < len(tokens):
         if i < len(tokens) - 1:
-            unit = get_unit('%s%s' % (tokens[i].replace('.','').strip(), tokens[i+1].replace('.','').strip() ) )
+            unit = get_unit('%s%s' % 
+                        (tokens[i].replace('.','').strip(), 
+                         tokens[i+1].replace('.','').strip() ) )
             if unit is not None:
                 units[i] = {'unit':unit.name, 'endtoken':i+1}
                 i+=1
@@ -40,7 +42,9 @@ def headingDictionary(tokens):
     i = 0
     while i < len(tokens):
         if i < len(tokens) - 1:
-            heading = get_heading('%s%s' % (tokens[i].replace('.','').strip(), tokens[i+1].replace('.','').strip() ) )
+            heading = get_heading('%s%s' % 
+                            (tokens[i].replace('.','').strip(), 
+                             tokens[i+1].replace('.','').strip() ) )
             if heading is not None:
                 headings[i] = {'heading':heading.name, 'endtoken':i+1}
                 i+=1
@@ -59,7 +63,9 @@ def findUnits(tokens):
     i = 0
     while i < len(tokens):
         if i < len(tokens) - 1:
-            unit = get_unit('%s%s' % (tokens[i].replace('.','').strip(), tokens[i+1].replace('.','').strip() ) )
+            unit = get_unit('%s%s' % 
+                        (tokens[i].replace('.','').strip(), 
+                         tokens[i+1].replace('.','').strip() ) )
             if unit is not None:
                 units.append((i,unit.name,2))
                 i+=1
@@ -73,20 +79,30 @@ def findUnits(tokens):
 def findHeadings(tokens):
     # Don't do anything to change tokens.
     # headings: list of tuples of form
-    # (heading index in tokens, heading_name, number of tokens comprising heading)
+    # (heading index in tokens, heading_name, number of tokens comprising 
+    # heading)
     headings = []
     i = 0
     while i < len(tokens):
         if i < len(tokens) - 3:
-            heading = get_heading('%s%s%s%s' % (tokens[i].replace('.','').replace('-','').strip(), tokens[i+1].replace('.','').replace('-','').strip(), tokens[i+2].replace('.','').replace('-','').strip(), tokens[i+3].replace('.','').replace('-','').strip()))
+            heading = get_heading('%s%s%s%s' % 
+                        (tokens[i].replace('.','').replace('-','').strip(), 
+                         tokens[i+1].replace('.','').replace('-','').strip(), 
+                         tokens[i+2].replace('.','').replace('-','').strip(), 
+                         tokens[i+3].replace('.','').replace('-','').strip()))
             if heading is not None: 
                 headings.append((i,heading.name,4))
         if i < len(tokens) - 2:
-            heading = get_heading('%s%s%s' % (tokens[i].replace('.','').replace('-','').strip(), tokens[i+1].replace('.','').replace('-','').strip(), tokens[i+2].replace('.','').replace('-','').strip()))
+            heading = get_heading('%s%s%s' % 
+                        (tokens[i].replace('.','').replace('-','').strip(), 
+                         tokens[i+1].replace('.','').replace('-','').strip(), 
+                         tokens[i+2].replace('.','').replace('-','').strip()))
             if heading is not None: 
                 headings.append((i,heading.name,3))
         if i < len(tokens) - 1:
-            heading = get_heading('%s%s' % (tokens[i].replace('.','').replace('-','').strip(), tokens[i+1].replace('.','').replace('-','').strip()))
+            heading = get_heading('%s%s' % 
+                        (tokens[i].replace('.','').replace('-','').strip(), 
+                         tokens[i+1].replace('.','').replace('-','').strip()))
             if heading is not None: 
                 headings.append((i,heading.name,2))
         heading = get_heading(tokens[i].replace('.','').replace('-','').strip())
@@ -98,12 +114,15 @@ def findHeadings(tokens):
 def findNumbers(tokens):
     # Don't do anything to change tokens.
     # numbers: list of tuples of form
-    # (numnber's index in tokens, number value, count of tokens comprising number)
+    # (numnber's index in tokens, number value, count of tokens comprising 
+    # number)
     numbers = []
     i = 0
     while i < len(tokens):
         if i < len(tokens) - 1:
-            number = get_number('%s%s' % (tokens[i].replace('.','').strip(), tokens[i+1].replace('.','').strip() ) )
+            number = get_number('%s%s' % 
+                            (tokens[i].replace('.','').strip(), 
+                             tokens[i+1].replace('.','').strip() ) )
             if number is not None:
                 numbers.append((i,number,2))
                 i+=1
@@ -121,7 +140,8 @@ def retokenize(tokens):
     i = 0
     for token in tokens:
         test = separate_numbers_from_strings(token)
-        if len(newtokens) > 0 and is_number(newtokens[len(newtokens)-1]) and is_number(test[0]) and float(test[0]) < 1:
+        if len(newtokens) > 0 and is_number(newtokens[len(newtokens)-1]) and \
+                is_number(test[0]) and float(test[0]) < 1:
             hasfraction = i
         for t in test:
             newtokens.append(t)
@@ -132,7 +152,8 @@ def retokenize(tokens):
     i = 0
     for token in newtokens:
         if i == hasfraction - 1:
-            combo = float(newtokens[hasfraction-1])+float(newtokens[hasfraction])
+            combo = float(newtokens[hasfraction-1]) + \
+            float(newtokens[hasfraction])
             finaltokens.append(str(combo))
         elif i == hasfraction:
             pass
@@ -168,13 +189,15 @@ def findNUH(loc):
                             rest = (rest+" "+retokens[i]).strip()
                             i = i + 1
                         if rest != '':
-                            return (offset, units[u]['unit'], headings[h]['heading'], rest)
+                            return (offset, units[u]['unit'], 
+                                    headings[h]['heading'], rest)
                         i = end + 1
                         while i < numtokens:
                             rest = (rest+" "+retokens[i]).strip()
                             i = i + 1
                         if rest != '':
-                            return (offset, units[u]['unit'], headings[h]['heading'], rest)
+                            return (offset, units[u]['unit'], 
+                                    headings[h]['heading'], rest)
     return None
 
 def parse_loc(loc, loctype):
@@ -202,12 +225,13 @@ def parse_loc(loc, loctype):
            }                
        
    if loctype.lower()=='foh':
-       # TODO: Start with what you know - find unit. Unit should be followed by heading
-       # and preceded by distance.
+       # TODO: Start with what you know - find unit. Unit should be followed 
+       # by heading and preceded by distance.
        nuh = findNUH(loc)
        if nuh is None:
            # Most common form is number, unit, heading. Try this first. 
-           # If this combo is not found, do further processing. Return None if an FOH can not be formed.
+           # If this combo is not found, do further processing. Return None 
+           # if an FOH can not be formed.
            return None
        status='nuh complete'
 
@@ -248,7 +272,8 @@ def has_num(token):
 
 def get_fraction(token):
     frac = token.split('/')
-    if len(frac)==2 and frac[0].isdigit() and frac[1].isdigit() and float(frac[1])!=0:
+    if len(frac)==2 and frac[0].isdigit() and frac[1].isdigit() and \
+        float(frac[1])!=0:
         return truncate(float(frac[0])/float(frac[1]),4)
     return None
 
@@ -291,19 +316,22 @@ def separate_numbers_from_strings(token):
         frac = get_fraction(token)
         newtokens.append(frac)
         return newtokens
-    # If it isn't a number but starts with a number, return number and non-number tokens
+    # If it isn't a number but starts with a number, return number and 
+    # non-number tokens
     numstr = ''
     nonnumstr = '' 
     if token[0].isdigit() or isDecimalIndicator(token[0]):
         i = 0
-        while i < len(token) and ( token[i].isdigit() or isDecimalIndicator(token[i]) ):
+        while i < len(token) and ( token[i].isdigit() or \
+                isDecimalIndicator(token[i]) ):
             numstr = '%s%s' % (numstr, token[i])
             i += 1
         nonnumstr = right(token, len(token) - i)
         newtokens.append(numstr)
         newtokens.append(nonnumstr)
         return newtokens
-    # If it isn't a number but ends with a number, return non-number and number tokens
+    # If it isn't a number but ends with a number, return non-number and 
+    # number tokens
     i = 0
     while i < len(token) and not token[i].isdigit():
         nonnumstr = '%s%s' % (nonnumstr, token[i])
