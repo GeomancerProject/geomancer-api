@@ -12,6 +12,6 @@ handlers:
 - url: /api/georef.*
   script: geomancer.api.handler
 
-- url: /oauth/.*
-  script: geomancer.oauth.handler
+- url: /admin/.*
+  script: admin.handler
   login: admin

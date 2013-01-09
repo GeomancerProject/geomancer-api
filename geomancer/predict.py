@@ -1,18 +1,10 @@
 import httplib2
 from apiclient.discovery import build
+from geomancer.model import Cache
 from google.appengine.ext import ndb
 
-class LocType(ndb.Model):
-	results = ndb.JsonProperty(required=True)
-
-	@classmethod
-	def get_by_name(cls, name):
-		return cls.get_by_id(cls.normalize(name))
-
-	@classmethod
-	def normalize(cls, name):
-		"Return the normalized version of supplied locality name."
-		return name.lower().strip()
+class Predict(Cache):
+	pass
 
 def format(jsonscores):
 	scores = {}
@@ -27,19 +19,17 @@ def format(jsonscores):
 
 def loctype(name, credentials=None, model='loctype'):
 	"Retutn [type, scores] for supplied locality name."
-	loctype = LocType.get_by_name(name)
-	if loctype:
+	loctype = Predict.get_or_insert(name)
+	if loctype.results:
 		return loctype.results
-	if not credentials:
-		return ['f', []]		
 	payload = {"input": {"csvInstance": [name]}}
 	http = credentials.authorize(httplib2.Http())
 	service = build('prediction', 'v1.5', http=http)
 	resp = service.trainedmodels().predict(id=model, body=payload).execute()
 	prediction = resp['outputLabel']
 	scores = format(resp['outputMulti'])
-	results = [prediction, scores]
-	LocType(id=LocType.normalize(name), results=results).put()
-	return results
+	loctype.results = [prediction, scores]
+	loctype.put()
+	return loctype.results
 
 
