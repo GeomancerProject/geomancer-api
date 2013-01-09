@@ -3,21 +3,27 @@ from geomancer.constants import DistanceUnits, Headings
 
 DEGREE_DIGITS = 7
 
-FORMAT = """.%sf"""
-
 def truncate(x, digits):
-    """Returns x including precision to the right of the decimal equal to digits."""
-    format_x = FORMAT % digits
-    return format(x,format_x)
+    """Returns a string representation of x including a number of places to the right of 
+    the decimal equal to digits.
+    
+    Arguments:
+        x - the input float
+        digits - the number of places of precision to the right of the decimal
+    """
+    if x==0:
+        return '0'
+    if digits==0:
+        return str(int(round(x)))
+    FORMAT = """.%sf"""
+    format_x = FORMAT % str(int(digits))
+    return format(x, format_x).rstrip('0').rstrip('.')
 
 def unitDictionary(tokens):
     units = {}
     i = 0
     while i < len(tokens):
         if i < len(tokens) - 1:
-            # TODO? These are unused:
-            # ti = tokens[i] 
-            # ti1 = tokens[i+1]
             unit = get_unit('%s%s' % (tokens[i].replace('.','').strip(), tokens[i+1].replace('.','').strip() ) )
             if unit is not None:
                 units[i] = {'unit':unit.name, 'endtoken':i+1}
@@ -34,9 +40,6 @@ def headingDictionary(tokens):
     i = 0
     while i < len(tokens):
         if i < len(tokens) - 1:
-            # TODO? These are unused:            
-            # ti = tokens[i]
-            # ti1 = tokens[i+1]
             heading = get_heading('%s%s' % (tokens[i].replace('.','').strip(), tokens[i+1].replace('.','').strip() ) )
             if heading is not None:
                 headings[i] = {'heading':heading.name, 'endtoken':i+1}
@@ -113,12 +116,31 @@ def findNumbers(tokens):
 
 def retokenize(tokens):
     newtokens = []
+    hasfraction = -1
+    hasnum = -1
+    i = 0
     for token in tokens:
         test = separate_numbers_from_strings(token)
+        if len(newtokens) > 0 and is_number(newtokens[len(newtokens)-1]) and is_number(test[0]) and float(test[0]) < 1:
+            hasfraction = i
         for t in test:
             newtokens.append(t)
-    return newtokens
-
+            i = i + 1
+    if hasfraction == -1:
+        return newtokens
+    finaltokens = []
+    i = 0
+    for token in newtokens:
+        if i == hasfraction - 1:
+            combo = float(newtokens[hasfraction-1])+float(newtokens[hasfraction])
+            finaltokens.append(str(combo))
+        elif i == hasfraction:
+            pass
+        else:
+            finaltokens.append(token)
+        i = i + 1
+    return finaltokens
+    
 def findNUH(loc):
     tokens = [x.strip() for x in loc.split()]
     # Preprocess the tokens to separate non-fraction numbers joined to strings
@@ -126,19 +148,9 @@ def findNUH(loc):
     units = unitDictionary(retokens)
     if units is None:
         return None
-#    headings = findHeadings(retokens)
     headings = headingDictionary(retokens)
     if headings is None:
         return None
-    # Keep only unit, heading combinations that are sequential
-#    uh = []
-#    for heading in headings:
-#        position = heading[0]
-#        units1 = units[position-1]
-#        if units[position-1] is not None:
-#            #Find number preceding uh
-#            uh.append(units)
-#        try:
         
     for u in units:
         uend = units[u]['endtoken']
@@ -211,7 +223,7 @@ def parse_loc(loc, loctype):
        if len(fsplit) > 1:
            stop_words = ['of','from','to']
            if fsplit[0].lower() in stop_words:
-               feature=feature.lstrip(feature[0]).strip()
+               feature=feature.lstrip(fsplit[0]).strip()
        features.append(feature)
        status='complete'
        interpreted_loc='%s %s %s %s' % (offsetval, offsetunit, heading, feature)
@@ -237,7 +249,7 @@ def has_num(token):
 def get_fraction(token):
     frac = token.split('/')
     if len(frac)==2 and frac[0].isdigit() and frac[1].isdigit() and float(frac[1])!=0:
-        return truncate(float(frac[0]/frac[1]),4)
+        return truncate(float(frac[0])/float(frac[1]),4)
     return None
 
 def left(str, charcount):
@@ -276,9 +288,10 @@ def separate_numbers_from_strings(token):
         return newtokens
     # If it is a fraction, return it as is.
     if is_fraction(token):
-        newtokens.append(token)
+        frac = get_fraction(token)
+        newtokens.append(frac)
         return newtokens
-    # If it isn't a number but starts with a number, return number and nonnumber tokens
+    # If it isn't a number but starts with a number, return number and non-number tokens
     numstr = ''
     nonnumstr = '' 
     if token[0].isdigit() or isDecimalIndicator(token[0]):
@@ -290,16 +303,13 @@ def separate_numbers_from_strings(token):
         newtokens.append(numstr)
         newtokens.append(nonnumstr)
         return newtokens
-    # If it isn't a number but ends with a number, return nonnumber and number tokens
+    # If it isn't a number but ends with a number, return non-number and number tokens
     i = 0
     while i < len(token) and not token[i].isdigit():
         nonnumstr = '%s%s' % (nonnumstr, token[i])
         i += 1
-    
-    # TODO: tokens not defines, is_num not defined.
-    #numstr = right(tokens, len(token) - i)
-    #if is_num(numstr):
-    
+    numstr = right(tokens, len(token) - i)
+    if is_num(numstr):
         newtokens.append(nonnumstr)
         newtokens.append(numstr)
         return newtokens
@@ -315,9 +325,7 @@ def get_number(s):
         # s is not a number in the form of a float. Try other forms:
         # fractions such as 1/2
         # number words
-        if has_num(s) is not None:
-            pass
-        return None
+        return get_fraction(s)
 
 def is_number(s):
     try:
