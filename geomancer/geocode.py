@@ -1,7 +1,6 @@
 import json
 import urllib
 from geomancer.model import Cache
-from google.appengine.ext import ndb
 from google.appengine.api import urlfetch
 
 class Geocode(Cache):

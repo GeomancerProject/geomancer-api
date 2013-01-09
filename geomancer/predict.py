@@ -1,7 +1,6 @@
 import httplib2
 from apiclient.discovery import build
 from geomancer.model import Cache
-from google.appengine.ext import ndb
 
 class Predict(Cache):
 	pass
