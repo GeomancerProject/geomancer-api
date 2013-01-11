@@ -19,7 +19,7 @@ def georeference(name, credentials=None):
     parts['geocodes'] = {}
     for feature in parts['features']:
         parts['geocodes'][feature] = geocode.lookup(normalize(feature))
-    georefs = error.calculate(parts)
+    georefs = error.get_georefs_from_parts(parts)
     return Locality(id=Locality.normalize(name), name=name, loctype=loctype, 
         parts=parts, georefs=georefs)
 

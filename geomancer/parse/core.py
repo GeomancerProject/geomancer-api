@@ -1,7 +1,7 @@
 import math
 import logging
 from geomancer.constants import DistanceUnits, Headings
-from point import *
+from geomancer.point import *
 
 def findHeadings(tokens):
     # Don't do anything to change tokens.

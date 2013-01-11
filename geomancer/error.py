@@ -1,5 +1,5 @@
-import core
-import point
+from geomancer.parse.core import *
+from geomancer.point import *
 
 def get_georefs_from_parts(parts): 
 	if parts is None:
