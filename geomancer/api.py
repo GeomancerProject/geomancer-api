@@ -12,13 +12,16 @@ def normalize(name):
 
 def georeference(name, credentials=None):
     name = normalize(name)
+    logging.info('GEOREF %s' % name)
     loctype, scores = predict.loctype(name, credentials=credentials)
+    logging.info('LOCTYPE %s' % loctype)
     parts = parse.parts(name, loctype)
+    logging.info('PARTS %s' % parts)
     if len(parts) == 0:
         return None
-    parts['geocodes'] = {}
+    parts['feature_geocodes'] = {}
     for feature in parts['features']:
-        parts['geocodes'][feature] = geocode.lookup(normalize(feature))
+        parts['feature_geocodes'][feature] = geocode.lookup(normalize(feature))
     georefs = error.get_georefs_from_parts(parts)
     return Locality(id=Locality.normalize(name), name=name, loctype=loctype, 
         parts=parts, georefs=georefs)
