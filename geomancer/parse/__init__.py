@@ -5,7 +5,7 @@ class Parts(Cache):
 	pass
 
 def parts(name, loctype):
-	"""Retutn parts dictionary from supplied locality name and type."""
+	"""Return parts dictionary from supplied locality name and type."""
 	parts = Parts.get_or_insert(name)
 	if parts.results:
 		return parts.results	
