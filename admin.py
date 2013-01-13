@@ -59,8 +59,10 @@ class FlushHandler(webapp2.RequestHandler):
 	def get(self):
 		from geomancer.model import Cache, Locality
 		from google.appengine.ext import ndb
+		from google.appengine.api import memcache
 		ndb.delete_multi(Cache.query().fetch(keys_only=True))
 		ndb.delete_multi(Locality.query().fetch(keys_only=True))
+		memcache.flush_all()
 
 handler = webapp2.WSGIApplication(
 	[('/admin/oauth', AuthHandler),
