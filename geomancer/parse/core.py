@@ -276,6 +276,8 @@ def get_heading(headingstr):
 def get_maps_response_georefs(response):
     georefs = []
     results = response.get('results')
+    logging.info('RESULTS %s' % results)
+    
     if results is None:
         return None
     geom = results[0].get('geometry')

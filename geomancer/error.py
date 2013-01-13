@@ -13,9 +13,14 @@ def get_georefs_from_parts(parts):
 	
 	georefs=[]
 	if loc_type == 'f':
-		georefs = get_maps_response_georefs(feature_geocodes)
+		for geocode in feature_geocodes.values():
+			logging.info('GEOCODE %s' % geocode)
+			feature_georefs = get_maps_response_georefs(geocode)
+			for g in feature_georefs:
+				georefs.append(g)
 	elif loc_type == 'foh':
 		for geocode in feature_geocodes.values():
+			logging.info('GEOCODE %s' % geocode)
 			feature_georefs = get_maps_response_georefs(geocode)
 			for g in feature_georefs:
 				flat = get_number(g['lat'])
