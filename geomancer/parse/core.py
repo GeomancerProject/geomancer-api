@@ -2,6 +2,7 @@ import math
 import logging
 from geomancer.constants import DistanceUnits, Headings
 from geomancer.point import *
+from geomancer.bb import *
 
 def findHeadings(tokens):
     # Don't do anything to change tokens.
@@ -166,10 +167,28 @@ def foh_error_point(center, extentstr, offset, offsetunit, heading):
     offsetinmeters = float(offset) * float(fromunit.tometers)    
     # This following isn't rigorously correct. It should be a rhumb line, not a great circle route.
     newpoint = center.get_point_on_rhumb_line(offsetinmeters, bearing)
+    bb = bb_from_pr(newpoint,error)
+    lat = truncate(newpoint.lat, DEGREE_DIGITS)
+    lng = truncate(newpoint.lng, DEGREE_DIGITS)
+    unc = truncate(error, 0)
+    n = truncate(bb.nw.lat,DEGREE_DIGITS)
+    w = truncate(bb.nw.lng,DEGREE_DIGITS)
+    s = truncate(bb.se.lat,DEGREE_DIGITS)
+    e = truncate(bb.se.lng,DEGREE_DIGITS)
+    ne = {}
+    sw = {}
+    ne['lat'] = n
+    ne['lng'] = e
+    sw['lat'] = s
+    sw['lng'] = w
+    bounds = {}
+    bounds['northeast'] = ne
+    bounds['southwest'] = sw
     georef = {
-              'lat': truncate(newpoint.lat, DEGREE_DIGITS),
-              'lng': truncate(newpoint.lng, DEGREE_DIGITS),
-              'uncertainty' : truncate(error, 0) 
+              'lat': lat,
+              'lng': lng,
+              'uncertainty' : unc,
+              'bounds': bounds
               }
     return georef
 
@@ -276,20 +295,20 @@ def get_heading(headingstr):
 def get_maps_response_georefs(response):
     georefs = []
     results = response.get('results')
-    logging.info('RESULTS %s' % results)
-    
     if results is None:
         return None
     geom = results[0].get('geometry')
     if geom is None:
         return None
-    latlng = geom.get('location')
-    if latlng is None:
-        return None
-    lat = latlng.get('lat')
-    lng = latlng.get('lng')
+    lat = None
+    lng = None
     bounds = geom.get('bounds')
     if bounds is None:
+        latlng = geom.get('location')
+        if latlng is None:
+            return None
+        lat = latlng.get('lat')
+        lng = latlng.get('lng')
         scale = geom.get('location_type')
         if scale == 'ROOFTOP':
             uncertainty = 30
@@ -298,18 +317,26 @@ def get_maps_response_georefs(response):
         else:
             uncertainty = 1000
     else: # bounds are given
-        # Careful of boundary conditions. 
+        # TODO: Be careful of boundary conditions. 
         # Choose boundary on the same side of lng=180
         ne = bounds.get('northeast')
+        sw = bounds.get('southwest')
         n = ne.get('lat')
         e = ne.get('lng')
-        start_point = Point(lng, lat)
-        end_point = Point(e, n)
-        uncertainty = start_point.haversine_distance(end_point)
+        s = sw.get('lat')
+        w = sw.get('lng')
+        nw = Point(w,n)
+        se = Point(e,s)
+        bb = BoundingBox(nw,se)
+        center = bb.center()
+        lat=center.lat
+        lng=center.lng
+        uncertainty = center.haversine_distance(se)
     georef = {
               'lat': truncate(lat, DEGREE_DIGITS),
               'lng': truncate(lng, DEGREE_DIGITS),
-              'uncertainty': truncate(uncertainty, 0)
+              'uncertainty': truncate(uncertainty, 0),
+              'bounds': bounds
              }
     georefs.append(georef)
     return georefs
