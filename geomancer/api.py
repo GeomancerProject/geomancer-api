@@ -1,3 +1,4 @@
+import logging
 import webapp2
 from geomancer import predict, parse, geocode, error, util
 from geomancer.model import Locality
@@ -67,9 +68,11 @@ class ApiHandler(webapp2.RequestHandler):
             loc = georeference(name, credentials)
             if loc:
                 loc.put()
+                response = util.dumps(create_result(loc))
             else:
                 loc = dict(oops='Unable to georeference %s' % name)            
-    	self.response.out.write(util.dumps(create_result(loc)))
+                response = util.dumps(loc)
+    	self.response.out.write(response)
 
 class StubHandler(webapp2.RequestHandler):
     STUB = {
