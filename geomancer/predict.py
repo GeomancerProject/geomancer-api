@@ -17,7 +17,7 @@ def format(jsonscores):
 		scores[label] = score
 	return scores
 
-def loctype(name, credentials=None, model='geomancer-loctype'):
+def loctype(name, credentials=None, model='loctype'):
 	"Return [type, scores] for supplied locality name."
 	loctype = Predict.get_or_insert(name)
 	if loctype.results:
