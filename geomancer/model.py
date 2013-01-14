@@ -1,5 +1,6 @@
 from google.appengine.ext import ndb
 from google.appengine.ext.ndb import polymodel
+import logging
 
 class Cache(polymodel.PolyModel):
 	results = ndb.JsonProperty()
@@ -21,9 +22,15 @@ class Locality(ndb.Model):
 	@classmethod
 	def get_by_name(cls, name):
 		"Return Locality from supplied name or None if it doesn't exits."
-		return cls.get_by_id(cls.normalize(name))
+		n = cls.get_by_id(cls.normalize(name))
+		logging.info('NAME after get_by_name %s\n' % n)
+		return n
+#		return cls.get_by_id(cls.normalize(name))
 
 	@classmethod
 	def normalize(cls, locname):
 		"Return the normalized version of supplied locality name."
-		return locname.lower().strip()
+		n = locname.lower().strip()
+		logging.info('NAME after normalize %s\n' % n)
+		return n
+#		return locname.lower().strip()
