@@ -13,20 +13,23 @@ def normalize(name):
 def georeference(name, credentials=None):
     name = normalize(name)
     loctype, scores = predict.loctype(name, credentials=credentials)
-    logging.info('LOCTYPE %s\n' % loctype)
     parts = parse.parts(name, loctype)
-    logging.info('PARTS_BEFORE_LOOKUP %s\n' % parts)
     if len(parts) == 0:
-        return None
+        return dict(status='Failed', locality=name, 
+            why='Unsupported loctype %s' % loctype)
     parts['feature_geocodes'] = {}
     for feature in parts['features']:
         fg = geocode.lookup(normalize(feature))
         logging.info('FEATURE_GEOCODES for %s %s\n' % (feature, fg) )
         parts['feature_geocodes'][feature] = geocode.lookup(normalize(feature))
     georefs = error.get_georefs_from_parts(parts)
-    logging.info('GEOREFS %s\n' % georefs)
-    return Locality(id=Locality.normalize(name), name=name, loctype=loctype, 
+    if len(georefs) == 0:
+        return dict(status='Failed', locality=name, 
+            why='No georeferences for loctype %s' % loctype)
+    loc = Locality(id=Locality.normalize(name), name=name, loctype=loctype, 
         parts=parts, georefs=georefs)
+    loc.put()
+    return loc
 
 def create_geojson(georef):
     "Return GeoJSON representation of georef dictionary."
@@ -66,12 +69,11 @@ class ApiHandler(webapp2.RequestHandler):
     	logging.info('LOC %s\n\n' % loc)
     	if not loc or loc.georefs is None:
             loc = georeference(name, credentials)
-            if loc:
-                loc.put()
-                response = util.dumps(create_result(loc))
-            else:
-                loc = dict(oops='Unable to georeference %s' % name)            
+            if type(loc) == dict:
                 response = util.dumps(loc)
+            else:
+                loc.put()
+                response = util.dumps(create_result(loc))                
     	self.response.out.write(response)
 
 class StubHandler(webapp2.RequestHandler):
