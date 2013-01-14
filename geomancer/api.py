@@ -1,3 +1,4 @@
+import logging
 import webapp2
 from geomancer import predict, parse, geocode, error, util
 from geomancer.model import Locality
