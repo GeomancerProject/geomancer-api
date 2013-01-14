@@ -33,4 +33,3 @@ class Locality(ndb.Model):
 		n = locname.lower().strip()
 		logging.info('NAME after normalize %s\n' % n)
 		return n
-#		return locname.lower().strip()
