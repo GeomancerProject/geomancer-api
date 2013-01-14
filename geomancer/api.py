@@ -64,16 +64,16 @@ class ApiHandler(webapp2.RequestHandler):
     	if not credentials or credentials.invalid:
     		raise Exception('missing OAuth 2.0 credentials')
     	name = self.request.get('q')
-        logging.info('NAME %s\n\n' % name)
     	loc = Locality.get_by_name(name)
-    	logging.info('LOC %s\n\n' % loc)
     	if not loc or loc.georefs is None:
             loc = georeference(name, credentials)
             if type(loc) == dict:
                 response = util.dumps(loc)
             else:
-                loc.put()
-                response = util.dumps(create_result(loc))                
+                response = util.dumps(create_result(loc))             
+        else:
+            response = util.dumps(create_result(loc))             
+
     	self.response.out.write(response)
 
 class StubHandler(webapp2.RequestHandler):
