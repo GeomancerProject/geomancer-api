@@ -27,6 +27,29 @@ def georeference(name, credentials=None):
     return Locality(id=Locality.normalize(name), name=name, loctype=loctype, 
         parts=parts, georefs=georefs)
 
+def create_geojson(georef):
+    "Return GeoJSON representation of georef dictionary."
+    return {
+        "feature": {                  
+            "type": "Feature",
+            "bbox": [-180.0, -90.0, 180.0, 90.0], # TODO
+            "geometry": { 
+                "type": "Point",  
+                "coordinates": [float(georef['lng']), float(georef['lat'])]
+            }
+        },
+        "uncertainty": float(georef['uncertainty'])
+    }
+
+def create_result(loc):
+    "Return supplied Locality as a Geomancer result object."
+    return dict(
+        location=dict(
+            original=loc.name,
+            normalized=loc.parts['interpreted_loc'],
+            type=loc.parts['locality_type']),
+        georefs=map(create_geojson, loc.georefs))
+
 class ApiHandler(webapp2.RequestHandler):
     def post(self):
         self.get()
@@ -45,8 +68,8 @@ class ApiHandler(webapp2.RequestHandler):
             if loc:
                 loc.put()
             else:
-                loc = dict(oops='Unable to georeference %s' % name)
-    	self.response.out.write(util.dumps(loc))
+                loc = dict(oops='Unable to georeference %s' % name)            
+    	self.response.out.write(util.dumps(create_result(loc)))
 
 class StubHandler(webapp2.RequestHandler):
     STUB = {
