@@ -96,10 +96,6 @@ class BoundingBox(object):
         return -1
 
     @classmethod
-    def get_intersecting(cls, bb_list):
-        pass # TODO
-
-    @classmethod
     def intersect_all(cls, bb_list):
         n = len(bb_list)
         if n == 1:
@@ -158,10 +154,9 @@ class BoundingBox(object):
     
     def calc_radius(self):
         """Returns a radius in meters from the center to the farthest corner of the bounding box."""
-        return self.se.haversine_distance(self.nw)/2.0
+        r = self.se.haversine_distance(self.nw)/2.0
+        return int(truncate(r,0))
   
-# Inject here for MoL
-# http://code.google.com/apis/maps/documentation/javascript/maptypes.html#CustomMapTypes
     def get_tile_origin(self, tile_x, tile_y, zoom):
         '''Return the lat, lng of the northwest corner of the tile.'''
         tile_width = 360.0/pow(2,zoom) # degrees
@@ -263,8 +258,8 @@ def bb_from_pr(center,radius):
     e = center.get_point_on_rhumb_line(radius,90)
     s = center.get_point_on_rhumb_line(radius,180)
     w = center.get_point_on_rhumb_line(radius,270)
-    nw = Point(w.lng,n.lat)
-    se = Point(e.lng,s.lat)
+    nw = Point(float(truncate(w.lng,DEGREE_DIGITS)),float(truncate(n.lat,DEGREE_DIGITS)))
+    se = Point(float(truncate(e.lng,DEGREE_DIGITS)),float(truncate(s.lat,DEGREE_DIGITS)))
     return BoundingBox(nw,se)
 
 def great_circle_midpoint(p0,p1):
@@ -280,7 +275,9 @@ def great_circle_midpoint(p0,p1):
     by = math.cos(lat2) * math.sin(dlng)
     lat3 = math.atan2(math.sin(lat1) + math.sin(lat2), math.sqrt( (math.cos(lat1) + bx) * (math.cos(lat1)+bx) + by*by) ) 
     lng3 = lng1 + math.atan2(by, math.cos(lat1) + bx)
-    return Point(math.degrees(lng3),math.degrees(lat3))
+    lng = float(truncate(math.degrees(lng3), DEGREE_DIGITS))
+    lat = float(truncate(math.degrees(lat3), DEGREE_DIGITS))
+    return Point(lng,lat)
 
 def _getoptions():
     """Parses command line options and returns them."""
