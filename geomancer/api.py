@@ -31,6 +31,10 @@ def georeference(name, credentials=None):
     loc.put()
     return loc
 
+def create_csv(georef):
+    "Return georef dict as CSV."
+    return '%s,%s,%s' % (georef['lng'], georef['lat'], georef['uncertainty'])
+
 def create_geojson(georef):
     "Return GeoJSON representation of georef dictionary."
     n = georef['bounds']['northeast']['lat']
@@ -50,7 +54,16 @@ def create_geojson(georef):
         "uncertainty": georef['uncertainty']
     }
 
-def create_result(loc):
+def create_csv_result(loc):
+    "Return supplied Locality as a CSV string."
+    hdr = 'loc_original,loc_normalized,loc_type,longitude,latitude,uncertainty'
+    lines = [hdr]
+    for georef in loc.georefs:
+        lines.append('%s,%s,%s,%s' %(loc.name, loc.parts['interpreted_loc'],
+            loc.parts['locality_type'], create_csv(georef)))
+    return '\n'.join(lines)
+
+def create_geojson_result(loc):
     "Return supplied Locality as a Geomancer result object."
     return dict(
         location=dict(
@@ -58,6 +71,13 @@ def create_result(loc):
             normalized=loc.parts['interpreted_loc'],
             type=loc.parts['locality_type']),
         georefs=map(create_geojson, loc.georefs))
+
+def create_results(loc, format):
+    "Return results for Locality in format."
+    if format == 'csv':
+        return create_csv_result(loc)
+    else:
+        return util.dumps(create_geojson_result(loc))
 
 class ApiHandler(webapp2.RequestHandler):
     def post(self):
@@ -69,17 +89,21 @@ class ApiHandler(webapp2.RequestHandler):
     	if not credentials or credentials.invalid:
     		raise Exception('missing OAuth 2.0 credentials')
     	name = self.request.get('q')
+        format = self.request.get('f', 'geojson')
     	loc = Locality.get_by_name(name)
     	if not loc or loc.georefs is None:
             loc = georeference(name, credentials)
             if type(loc) == dict:
-                response = util.dumps(loc)
+                results = util.dumps(loc)
             else:
-                response = util.dumps(create_result(loc))             
+                results = create_results(loc, format)
         else:
-            response = util.dumps(create_result(loc))             
+            results = create_results(loc, format)
 
-    	self.response.out.write(response)
+        if format == 'csv':
+            self.response.headers['Content-type'] = 'text/csv'
+
+    	self.response.out.write(results)
 
 class StubHandler(webapp2.RequestHandler):
     STUB = {
