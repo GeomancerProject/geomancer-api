@@ -165,31 +165,9 @@ def foh_error_point(center, extentstr, offset, offsetunit, heading):
     bearing = float(get_heading(heading).bearing)
     fromunit = get_unit(offsetunit)
     offsetinmeters = float(offset) * float(fromunit.tometers)    
-    # This following isn't rigorously correct. It should be a rhumb line, not a great circle route.
     newpoint = center.get_point_on_rhumb_line(offsetinmeters, bearing)
     bb = bb_from_pr(newpoint,error)
-    lat = truncate(newpoint.lat, DEGREE_DIGITS)
-    lng = truncate(newpoint.lng, DEGREE_DIGITS)
-    unc = truncate(error, 0)
-    n = truncate(bb.nw.lat,DEGREE_DIGITS)
-    w = truncate(bb.nw.lng,DEGREE_DIGITS)
-    s = truncate(bb.se.lat,DEGREE_DIGITS)
-    e = truncate(bb.se.lng,DEGREE_DIGITS)
-    ne = {}
-    sw = {}
-    ne['lat'] = n
-    ne['lng'] = e
-    sw['lat'] = s
-    sw['lng'] = w
-    bounds = {}
-    bounds['northeast'] = ne
-    bounds['southwest'] = sw
-    georef = {
-              'lat': lat,
-              'lng': lng,
-              'uncertainty' : unc,
-              'bounds': bounds
-              }
+    georef = bb_to_georef(bb)
     return georef
 
 def getDirectionError(starterror, offset, headingstr):
@@ -297,50 +275,57 @@ def get_maps_response_georefs(response):
     results = response.get('results')
     if results is None:
         return None
-    geom = results[0].get('geometry')
-    if geom is None:
-        return None
-    lat = None
-    lng = None
-    bounds = geom.get('bounds')
-    if bounds is None:
-        latlng = geom.get('location')
-        if latlng is None:
-            return None
-        lat = latlng.get('lat')
-        lng = latlng.get('lng')
-        scale = geom.get('location_type')
-        if scale == 'ROOFTOP':
-            uncertainty = 30
-        elif scale == 'RANGE_INTERPOLATED':
-            uncertainty = 100
-        else:
-            uncertainty = 1000
-    else: # bounds are given
-        # TODO: Be careful of boundary conditions. 
-        # Choose boundary on the same side of lng=180
-        ne = bounds.get('northeast')
-        sw = bounds.get('southwest')
-        n = ne.get('lat')
-        e = ne.get('lng')
-        s = sw.get('lat')
-        w = sw.get('lng')
-        nw = Point(w,n)
-        se = Point(e,s)
-        bb = BoundingBox(nw,se)
-        center = bb.center()
-        lat=center.lat
-        lng=center.lng
-        uncertainty = center.haversine_distance(se)
-    georef = {
-              'lat': truncate(lat, DEGREE_DIGITS),
-              'lng': truncate(lng, DEGREE_DIGITS),
-              'uncertainty': truncate(uncertainty, 0),
-              'bounds': bounds
-             }
-    georefs.append(georef)
+    for result in results:
+        geom = result.get('geometry')
+        if geom is not None:
+            bb = geom_to_bb(geom)
+            georef = bb_to_georef(bb)
+            if georef is not None:
+                georefs.append(georef)
     return georefs
-    
+
+def bb_to_georef(bb):
+    if bb is None:
+        return None
+    if not bb.isvalid:
+        return None
+    ne = {}
+    sw = {}
+    ne['lat'] = bb.nw.lat
+    ne['lng'] = bb.se.lng
+    sw['lat'] = bb.se.lat
+    sw['lng'] = bb.nw.lng
+    bounds = {}
+    bounds['northeast'] = ne
+    bounds['southwest'] = sw
+    center = bb.center()
+    georef = {
+              'lat': center.lat,
+              'lng': center.lng,
+              'uncertainty': bb.calc_radius(),
+              'bounds': bounds
+              }
+    return georef
+
+def geom_to_bb(geometry):
+    ''' Returns a BoundingBox object from a geocode response geometry 
+        dictionary.'''
+    if geometry.has_key('bounds'):
+        nw = Point(geometry['bounds']['southwest']['lng'],
+                   geometry['bounds']['northeast']['lat'])
+        se = Point(geometry['bounds']['northeast']['lng'],
+                   geometry['bounds']['southwest']['lat'])
+        return BoundingBox(nw, se)
+    if geometry.has_key('location'):
+        center = Point(geometry['location']['lng'],
+                       geometry['location']['lat'])
+        geom_type = geometry.get('location_type')
+    if geom_type == 'ROOFTOP':
+        return bb_from_pr(center, 30)
+    if geom_type == 'RANGE_INTERPOLATED':
+        return bb_from_pr(center, 100)
+    return bb_from_pr(center, 1000)
+
 def get_number(s):
     try:
         float(s)
