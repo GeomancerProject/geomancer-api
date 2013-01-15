@@ -23,9 +23,9 @@ def get_georefs_from_parts(parts):
             logging.info('GEOCODE %s' % geocode)
             feature_georefs = get_maps_response_georefs(geocode)
             for g in feature_georefs:
-                flat = get_number(g['lat'])
-                flng = get_number(g['lng'])
-                func = get_number(g['uncertainty'])
+                flat = g['lat']
+                flng = g['lng']
+                func = g['uncertainty']
                 offset = parts['offset_value']
                 offsetunit = parts['offset_unit']
                 heading = parts['heading'] 

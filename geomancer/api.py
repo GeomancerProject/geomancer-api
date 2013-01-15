@@ -21,7 +21,7 @@ def georeference(name, credentials=None):
     for feature in parts['features']:
         fg = geocode.lookup(normalize(feature))
         logging.info('FEATURE_GEOCODES for %s %s\n' % (feature, fg) )
-        parts['feature_geocodes'][feature] = geocode.lookup(normalize(feature))
+        parts['feature_geocodes'][feature] = fg
     georefs = error.get_georefs_from_parts(parts)
     if len(georefs) == 0:
         return dict(status='Failed', locality=name, 
@@ -33,16 +33,21 @@ def georeference(name, credentials=None):
 
 def create_geojson(georef):
     "Return GeoJSON representation of georef dictionary."
+    n = georef['bounds']['northeast']['lat']
+    e = georef['bounds']['northeast']['lng']
+    s = georef['bounds']['southwest']['lat'] 
+    w = georef['bounds']['southwest']['lng']
+    logging.info('GEOREF for GEOJSON %s\n' % georef )
     return {
         "feature": {                  
             "type": "Feature",
-            "bbox": [-180.0, -90.0, 180.0, 90.0], # TODO
+            "bbox": [w, s, e, n],
             "geometry": { 
                 "type": "Point",  
-                "coordinates": [float(georef['lng']), float(georef['lat'])]
+                "coordinates": [georef['lng'], georef['lat']]
             }
         },
-        "uncertainty": float(georef['uncertainty'])
+        "uncertainty": georef['uncertainty']
     }
 
 def create_result(loc):
