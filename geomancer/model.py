@@ -11,7 +11,7 @@ class Cache(polymodel.PolyModel):
 		return super(Cache, cls).get_or_insert(id)
 
 class Locality(ndb.Model):
-	"Models a georeferenced locality."
+	"Models a georeferenced locality clause."
 	name = ndb.StringProperty()
 	loctype = ndb.StringProperty()
 	parts = ndb.JsonProperty()

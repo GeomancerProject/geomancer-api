@@ -1,7 +1,7 @@
 from geomancer import cdb
 import logging
 import webapp2
-from geomancer import predict, parse, geocode, error, util
+from geomancer import predict, parse, geocode, util
 from geomancer.model import Locality
 from google.appengine.ext.webapp.util import run_wsgi_app
 from oauth2client.appengine import CredentialsModel
@@ -21,9 +21,9 @@ def georeference(name, credentials=None):
     parts['feature_geocodes'] = {}
     for feature in parts['features']:
         fg = geocode.lookup(normalize(feature))
-        logging.info('FEATURE_GEOCODES for %s %s\n' % (feature, fg) )
+#        logging.info('FEATURE_GEOCODES for %s %s\n' % (feature, fg) )
         parts['feature_geocodes'][feature] = fg
-    georefs = error.get_georefs_from_parts(parts)
+    georefs = parse.core.get_georefs_from_parts(parts)
     if len(georefs) == 0:
         return dict(status='Failed', locality=name, 
             why='No georeferences for loctype %s' % loctype)
@@ -31,6 +31,26 @@ def georeference(name, credentials=None):
         parts=parts, georefs=georefs)
     loc.put()
     return loc
+        
+#    name = normalize(name)
+#    loctype, scores = predict.loctype(name, credentials=credentials)
+#    parts = parse.parts(name, loctype)
+#    if len(parts) == 0:
+#        return dict(status='Failed', locality=name, 
+#            why='Unsupported loctype %s' % loctype)
+#    parts['feature_geocodes'] = {}
+#    for feature in parts['features']:
+#        fg = geocode.lookup(normalize(feature))
+#        logging.info('FEATURE_GEOCODES for %s %s\n' % (feature, fg) )
+#        parts['feature_geocodes'][feature] = fg
+#    georefs = error.get_georefs_from_parts(parts)
+#    if len(georefs) == 0:
+#        return dict(status='Failed', locality=name, 
+#            why='No georeferences for loctype %s' % loctype)
+#    loc = Locality(id=Locality.normalize(name), name=name, loctype=loctype, 
+#        parts=parts, georefs=georefs)
+#    loc.put()
+#    return loc
 
 def create_csv(georef):
     "Return georef dict as CSV."
@@ -64,6 +84,16 @@ def create_csv_result(loc):
             loc.parts['locality_type'], create_csv(georef)))
     return '\n'.join(lines)
 
+def create_full_loc_geojson_result(loc):
+    "Return supplied full locality as a Geomancer result object."
+    logging.info('FULL_LOC_GEOJSON loc input %s\n' % loc )
+    return dict(
+        location=dict(
+            original=loc['locality'],
+#            loclist=loc['loclist'],
+            interpreted=loc['interpreted_locality']),
+        georefs=map(create_geojson, loc['georefs']))
+
 def create_geojson_result(loc):
     "Return supplied Locality as a Geomancer result object."
     return dict(
@@ -73,7 +103,14 @@ def create_geojson_result(loc):
             type=loc.parts['locality_type']),
         georefs=map(create_geojson, loc.georefs))
 
-def create_results(loc, format, user=None, api_key=None, table=None):
+def create_full_loc_results(loc, format):
+    "Return results for Locality in format."
+    if format == 'csv':
+        return create_csv_result(loc)
+    else:
+        return util.dumps(create_full_loc_geojson_result(loc))
+
+def create_results(loc, format):
     "Return results for Locality in format."
     if format == 'csv':
         return create_csv_result(loc)
@@ -93,20 +130,38 @@ class ApiHandler(webapp2.RequestHandler):
     		raise Exception('missing OAuth 2.0 credentials')
     	name = self.request.get('q')
         format = self.request.get('f', 'geojson')
-        user = self.request.get('user', None)
-        api_key = self.request.get('api_key', None)
-        table = self.request.get('table', None)
-    	loc = Locality.get_by_name(name)
-    	if not loc or loc.georefs is None:
-            loc = georeference(name, credentials)
-            if type(loc) == dict:
-                results = util.dumps(loc)
+        logging.info('NAME %s\n' % name )
+        clauses = parse.core.clauses_from_locality(name)
+        logging.info('CLAUSES %s\n' % clauses )
+        loclist = []
+        for clause in clauses:
+            loc = Locality.get_by_name(clause)
+            if not loc or loc.georefs is None:
+                # Georeference the clause
+                loc = georeference(clause, credentials)
+                if type(loc) == dict:
+                    results = util.dumps(loc)
+                else:
+                    loclist.append(loc)
+#                    results = create_results(loc, format)
             else:
-                results = create_results(loc, format, user=user, 
-                    api_key=api_key, table=table)
-        else:
-            results = create_results(loc, format, user=user, 
-                    api_key=api_key, table=table)
+                loclist.append(loc)
+#                results = create_results(loc, format)
+        # Should have a loclist of locs that didn't fail to georef now.
+        # Time to intersect the clauses and make a full locality georef.
+        interpreted_locality = ""
+        for loc in loclist:
+            interpreted_locality = interpreted_locality+'; '+loc.name
+#        logging.info('CLAUSES %s\n' % clauses )
+#        logging.info('LOCLIST %s\n' % loclist )
+        locgeoref = parse.core.loc_georefs(loclist)
+#        logging.info('LOCGEOREF %s\n' % locgeoref )
+        full_loc = {}
+        full_loc['locality']=name
+        full_loc['interpreted_locality']=interpreted_locality
+#        full_loc['loclist']=loclist
+        full_loc['georefs']=locgeoref
+        results = create_full_loc_results(full_loc,format)
 
         if format == 'csv':
             self.response.headers['Content-type'] = 'text/csv'

@@ -1,6 +1,7 @@
 import math
 import logging
 from geomancer.constants import DistanceUnits, Headings
+from geomancer.model import *
 from geomancer.point import *
 from geomancer.bb import *
 
@@ -261,6 +262,42 @@ def get_fraction(token):
         return truncate(float(frac[0]) / float(frac[1]), 4)
     return None
 
+def get_georefs_from_parts(parts): 
+    if parts is None:
+        return None
+    feature_geocodes = parts.get('feature_geocodes')
+    if feature_geocodes is None:
+        return None
+    loc_type = parts.get('locality_type')
+    if loc_type is None:
+        return None
+    
+    georefs=[]
+    if loc_type == 'f':
+        for geocode in feature_geocodes.values():
+#            logging.info('GEOCODE %s' % geocode)
+            feature_georefs = get_maps_response_georefs(geocode)
+            for g in feature_georefs:
+                georefs.append(g)
+    elif loc_type == 'foh':
+        for geocode in feature_geocodes.values():
+#            logging.info('GEOCODE %s' % geocode)
+            feature_georefs = get_maps_response_georefs(geocode)
+            for g in feature_georefs:
+                flat = g['lat']
+                flng = g['lng']
+                func = g['uncertainty']
+                offset = parts['offset_value']
+                offsetunit = parts['offset_unit']
+                heading = parts['heading'] 
+                georef = foh_error_point(Point(flng,flat), func, offset, offsetunit, 
+                    heading)
+                if georef is not None:
+                    georefs.append(georef)
+    else:
+        return None
+    return georefs
+
 def get_heading(headingstr):
     """Returns a Heading from a string."""
     h = headingstr.replace('-', '').replace(',', '').strip().lower()
@@ -306,6 +343,16 @@ def bb_to_georef(bb):
               'bounds': bounds
               }
     return georef
+
+def clauses_from_locality(location):
+    """Return list of Locality objects by splitting location on ',' and ';'."""
+    clauses = [name.strip() for name in set(reduce(
+                lambda x, y: x + y,
+                [x.split(';') for x in location.split(',')]))]
+    return clauses
+#    return [Locality(name.strip()) for name in set(reduce(
+#                lambda x, y: x + y,
+#                [x.split(';') for x in location.split(',')]))]
 
 def geom_to_bb(geometry):
     ''' Returns a BoundingBox object from a geocode response geometry 
@@ -396,6 +443,46 @@ def left(str, charcount):
     for i in range(charcount):
         newstr = '%s%s' % (newstr, str[i])
     return new_str
+
+def loc_georefs(localities):
+    """localities is a list of Locality."""
+    georef_lists = []
+    for loc in localities:
+        logging.info('LOC-PARTS %s' % loc.parts )
+        georefs = get_georefs_from_parts(loc.parts)
+        # TODO: Decide what to do if any sublocality returns no georefs. 
+        # For now, ignore that locality.
+        # Minimally, if we do this, we have to change the interpreted locality.
+        if len(georefs) > 0:
+            loc.georefs = georefs
+            georef_lists.append(georefs)
+    ''' Now we have a list of lists of georefs, and we need to find intersecting 
+        combos.'''
+    if len(georef_lists) == 0:
+        return None
+    results = georef_lists.pop()
+    while len(georef_lists) > 0:
+        new_results=[]
+        next_georefs = georef_lists.pop()
+        newglistcount = len(georef_lists)
+        for result in results:
+            w = float(result['bounds']['southwest']['lng'])
+            e = float(result['bounds']['northeast']['lng'])
+            n = float(result['bounds']['northeast']['lat'])
+            s = float(result['bounds']['southwest']['lat'])
+            for next_georef in next_georefs:
+                n_w = float(next_georef['bounds']['southwest']['lng'])
+                n_e = float(next_georef['bounds']['northeast']['lng'])
+                n_n = float(next_georef['bounds']['northeast']['lat'])
+                n_s = float(next_georef['bounds']['southwest']['lat'])
+                resultbb = BoundingBox( Point(w,n), Point(e,s) )
+                nextbb = BoundingBox(Point(float(n_w), float(n_n)),
+                                       Point(float(n_e), float(n_s)))
+                new_result = resultbb.intersection(nextbb)
+                if new_result is not None:
+                    new_results.append(bb_to_georef(new_result))
+        results = new_results
+    return results
 
 def parse_loc(loc, loctype):
    parts = {}
