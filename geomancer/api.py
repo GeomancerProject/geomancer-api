@@ -1,3 +1,4 @@
+from geomancer import cdb
 import logging
 import webapp2
 from geomancer import predict, parse, geocode, error, util
@@ -72,10 +73,12 @@ def create_geojson_result(loc):
             type=loc.parts['locality_type']),
         georefs=map(create_geojson, loc.georefs))
 
-def create_results(loc, format):
+def create_results(loc, format, user=None, api_key=None, table=None):
     "Return results for Locality in format."
     if format == 'csv':
         return create_csv_result(loc)
+    elif format == 'cartodb':
+        return cdb.save_results(create_csv_result(loc), user, api_key, table)
     else:
         return util.dumps(create_geojson_result(loc))
 
@@ -90,18 +93,27 @@ class ApiHandler(webapp2.RequestHandler):
     		raise Exception('missing OAuth 2.0 credentials')
     	name = self.request.get('q')
         format = self.request.get('f', 'geojson')
+        user = self.request.get('user', None)
+        api_key = self.request.get('api_key', None)
+        table = self.request.get('table', None)
     	loc = Locality.get_by_name(name)
     	if not loc or loc.georefs is None:
             loc = georeference(name, credentials)
             if type(loc) == dict:
                 results = util.dumps(loc)
             else:
-                results = create_results(loc, format)
+                results = create_results(loc, format, user=user, 
+                    api_key=api_key, table=table)
         else:
-            results = create_results(loc, format)
+            results = create_results(loc, format, user=user, 
+                    api_key=api_key, table=table)
 
         if format == 'csv':
             self.response.headers['Content-type'] = 'text/csv'
+        elif format == 'cartodb':
+            logging.info('RESULTS %s' % results)
+            self.redirect(str(results))
+            return
 
     	self.response.out.write(results)
 
