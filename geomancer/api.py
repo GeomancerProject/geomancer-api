@@ -1,8 +1,11 @@
 from geomancer import cdb
 import logging
+import json
 import webapp2
-from geomancer import predict, parse, geocode, util
-from geomancer.model import Locality
+from functools import partial
+from geomancer import predict, parse, geocode, util, core
+from geomancer.model import Locality, Georef, Clause
+from google.appengine.ext import ndb
 from google.appengine.ext.webapp.util import run_wsgi_app
 from oauth2client.appengine import CredentialsModel
 from oauth2client.appengine import StorageByKeyName
@@ -11,166 +14,67 @@ def normalize(name):
     "Return the normalized version of supplied name."
     return name.lower().strip()
 
-def georeference(name, credentials=None):
-    name = normalize(name)
-    loctype, scores = predict.loctype(name, credentials=credentials)
+def georef(creds, name):
+    """Return a georeferenced Clause model from supplied clause name. The Clause
+    will be populated with name, normalized_name, interpreted_name, loctype, parts,
+    and georefs but it will not be saved. This is an optimiation so that multiple
+    clauses can be saved using ndb.put_multi() by the caller. The Clause georefs 
+    will be saved.
+    """
+    clause = Clause.get_or_insert(name)
+    if clause.georefs:
+        return clause
+    loctype, scores = predict.loctype(name, creds)
     parts = parse.parts(name, loctype)
     if len(parts) == 0:
-        return dict(status='Failed', locality=name, 
-            why='Unsupported loctype %s' % loctype)
+        return None
     parts['feature_geocodes'] = {}
     for feature in parts['features']:
-        fg = geocode.lookup(normalize(feature))
-#        logging.info('FEATURE_GEOCODES for %s %s\n' % (feature, fg) )
-        parts['feature_geocodes'][feature] = fg
-    georefs = parse.core.get_georefs_from_parts(parts)
+        parts['feature_geocodes'][feature] = geocode.lookup(normalize(feature))
+    georefs = map(Georef.from_dict, core.get_georefs_from_parts(parts))
     if len(georefs) == 0:
-        return dict(status='Failed', locality=name, 
-            why='No georeferences for loctype %s' % loctype)
-    loc = Locality(id=Locality.normalize(name), name=name, loctype=loctype, 
-        parts=parts, georefs=georefs)
-    loc.put()
-    return loc
-        
-#    name = normalize(name)
-#    loctype, scores = predict.loctype(name, credentials=credentials)
-#    parts = parse.parts(name, loctype)
-#    if len(parts) == 0:
-#        return dict(status='Failed', locality=name, 
-#            why='Unsupported loctype %s' % loctype)
-#    parts['feature_geocodes'] = {}
-#    for feature in parts['features']:
-#        fg = geocode.lookup(normalize(feature))
-#        logging.info('FEATURE_GEOCODES for %s %s\n' % (feature, fg) )
-#        parts['feature_geocodes'][feature] = fg
-#    georefs = error.get_georefs_from_parts(parts)
-#    if len(georefs) == 0:
-#        return dict(status='Failed', locality=name, 
-#            why='No georeferences for loctype %s' % loctype)
-#    loc = Locality(id=Locality.normalize(name), name=name, loctype=loctype, 
-#        parts=parts, georefs=georefs)
-#    loc.put()
-#    return loc
-
-def create_csv(georef):
-    "Return georef dict as CSV."
-    return '%s,%s,%s' % (georef['lng'], georef['lat'], georef['uncertainty'])
-
-def create_geojson(georef):
-    "Return GeoJSON representation of georef dictionary."
-    n = georef['bounds']['northeast']['lat']
-    e = georef['bounds']['northeast']['lng']
-    s = georef['bounds']['southwest']['lat'] 
-    w = georef['bounds']['southwest']['lng']
-    logging.info('GEOREF for GEOJSON %s\n' % georef )
-    return {
-        "feature": {                  
-            "type": "Feature",
-            "bbox": [w, s, e, n],
-            "geometry": { 
-                "type": "Point",  
-                "coordinates": [georef['lng'], georef['lat']]
-            }
-        },
-        "uncertainty": georef['uncertainty']
-    }
-
-def create_csv_result(loc):
-    "Return supplied Locality as a CSV string."
-    hdr = 'loc_original,loc_normalized,loc_type,longitude,latitude,uncertainty'
-    lines = [hdr]
-    for georef in loc.georefs:
-        lines.append('%s,%s,%s,%s' %(loc.name, loc.parts['interpreted_loc'],
-            loc.parts['locality_type'], create_csv(georef)))
-    return '\n'.join(lines)
-
-def create_full_loc_geojson_result(loc):
-    "Return supplied full locality as a Geomancer result object."
-    logging.info('FULL_LOC_GEOJSON loc input %s\n' % loc )
-    return dict(
-        location=dict(
-            original=loc['locality'],
-#            loclist=loc['loclist'],
-            interpreted=loc['interpreted_locality']),
-        georefs=map(create_geojson, loc['georefs']))
-
-def create_geojson_result(loc):
-    "Return supplied Locality as a Geomancer result object."
-    return dict(
-        location=dict(
-            original=loc.name,
-            normalized=loc.parts['interpreted_loc'],
-            type=loc.parts['locality_type']),
-        georefs=map(create_geojson, loc.georefs))
-
-def create_full_loc_results(loc, format):
-    "Return results for Locality in format."
-    if format == 'csv':
-        return create_csv_result(loc)
-    else:
-        return util.dumps(create_full_loc_geojson_result(loc))
-
-def create_results(loc, format):
-    "Return results for Locality in format."
-    if format == 'csv':
-        return create_csv_result(loc)
-    elif format == 'cartodb':
-        return cdb.save_results(create_csv_result(loc), user, api_key, table)
-    else:
-        return util.dumps(create_geojson_result(loc))
+        return None
+    ndb.put_multi(georefs)
+    clause.interpreted_name = parts['interpreted_loc']
+    clause.loctype = loctype
+    clause.parts = parts
+    clause.georefs = [x.key for x in georefs]
+    return clause
 
 class ApiHandler(webapp2.RequestHandler):
+    def _get_creds(self):
+        creds = StorageByKeyName(CredentialsModel, 'geomancer-api/1.0', 
+            'credentials').locked_get()
+        if not creds or creds.invalid:
+            raise Exception('missing OAuth 2.0 credentials')
+        return creds
+
     def post(self):
         self.get()
 
     def get(self):
-    	credentials = StorageByKeyName(CredentialsModel, 'geomancer-api/1.0', 
-    		'credentials').locked_get()
-    	if not credentials or credentials.invalid:
-    		raise Exception('missing OAuth 2.0 credentials')
-    	name = self.request.get('q')
-        format = self.request.get('f', 'geojson')
-        logging.info('NAME %s\n' % name )
-        clauses = parse.core.clauses_from_locality(name)
-        logging.info('CLAUSES %s\n' % clauses )
-        loclist = []
-        for clause in clauses:
-            loc = Locality.get_by_name(clause)
-            if not loc or loc.georefs is None:
-                # Georeference the clause
-                loc = georeference(clause, credentials)
-                if type(loc) == dict:
-                    results = util.dumps(loc)
-                else:
-                    loclist.append(loc)
-#                    results = create_results(loc, format)
-            else:
-                loclist.append(loc)
-#                results = create_results(loc, format)
-        # Should have a loclist of locs that didn't fail to georef now.
-        # Time to intersect the clauses and make a full locality georef.
-        interpreted_locality = ""
-        for loc in loclist:
-            interpreted_locality = interpreted_locality+'; '+loc.name
-#        logging.info('CLAUSES %s\n' % clauses )
-#        logging.info('LOCLIST %s\n' % loclist )
-        locgeoref = parse.core.loc_georefs(loclist)
-#        logging.info('LOCGEOREF %s\n' % locgeoref )
-        full_loc = {}
-        full_loc['locality']=name
-        full_loc['interpreted_locality']=interpreted_locality
-#        full_loc['loclist']=loclist
-        full_loc['georefs']=locgeoref
-        results = create_full_loc_results(full_loc,format)
-
-        if format == 'csv':
-            self.response.headers['Content-type'] = 'text/csv'
-        elif format == 'cartodb':
-            logging.info('RESULTS %s' % results)
-            self.redirect(str(results))
-            return
-
-    	self.response.out.write(results)
+        creds = self._get_creds()
+    	loc_name = self.request.get('q')
+        format = self.request.get('f', 'json')
+        loc = Locality.get_or_insert(loc_name)
+        if not loc.georefs:            
+            clause_names = core.clauses_from_locality(loc_name)
+            clauses = [x for x in map(partial(georef, creds), clause_names) if x]
+            ndb.put_multi(clauses)
+            loc.interpreted_name = ';'.join([x.interpreted_name for x in clauses])        
+            loc.georefs = core.loc_georefs(clauses)
+            loc.clauses = [x.key for x in clauses]
+            loc.put()
+        if format == 'json':
+            self.response.out.headers['Content-Type'] = 'application/json'
+            result = json.dumps(loc.json)
+        elif format == 'csv':
+            self.response.out.headers['Content-Type'] = 'text/csv'
+            result = loc.csv
+        elif format == 'all':
+            self.response.out.headers['Content-Type'] = 'application/json'
+            result = util.dumps(loc)
+    	self.response.out.write(result)
 
 class StubHandler(webapp2.RequestHandler):
     STUB = {

@@ -1,5 +1,6 @@
+from geomancer import core
 from geomancer.model import Cache
-from geomancer.parse import core
+
 
 class Parts(Cache):
 	pass

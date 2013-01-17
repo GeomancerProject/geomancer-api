@@ -4,6 +4,7 @@ from geomancer.constants import DistanceUnits, Headings
 from geomancer.model import *
 from geomancer.point import *
 from geomancer.bb import *
+from google.appengine.ext import ndb
 
 def findHeadings(tokens):
     # Don't do anything to change tokens.
@@ -444,44 +445,34 @@ def left(str, charcount):
         newstr = '%s%s' % (newstr, str[i])
     return new_str
 
-def loc_georefs(localities):
-    """localities is a list of Locality."""
-    georef_lists = []
-    for loc in localities:
-        logging.info('LOC-PARTS %s' % loc.parts )
-        georefs = get_georefs_from_parts(loc.parts)
-        # TODO: Decide what to do if any sublocality returns no georefs. 
-        # For now, ignore that locality.
-        # Minimally, if we do this, we have to change the interpreted locality.
-        if len(georefs) > 0:
-            loc.georefs = georefs
-            georef_lists.append(georefs)
-    ''' Now we have a list of lists of georefs, and we need to find intersecting 
-        combos.'''
+def loc_georefs(clauses):
+    """Get georefs for each Clause in supplied list."""
+    georef_lists = [x.georefs for x in clauses]
     if len(georef_lists) == 0:
         return None
+    logging.info('GEOREF_LISTS %s' % georef_lists)
     results = georef_lists.pop()
     while len(georef_lists) > 0:
-        new_results=[]
+        new_results = []
         next_georefs = georef_lists.pop()
-        newglistcount = len(georef_lists)
         for result in results:
-            w = float(result['bounds']['southwest']['lng'])
-            e = float(result['bounds']['northeast']['lng'])
-            n = float(result['bounds']['northeast']['lat'])
-            s = float(result['bounds']['southwest']['lat'])
+            logging.info('RESULT %s' % result)
+            w, s, e, n = result.get().bbox
             for next_georef in next_georefs:
-                n_w = float(next_georef['bounds']['southwest']['lng'])
-                n_e = float(next_georef['bounds']['northeast']['lng'])
-                n_n = float(next_georef['bounds']['northeast']['lat'])
-                n_s = float(next_georef['bounds']['southwest']['lat'])
-                resultbb = BoundingBox( Point(w,n), Point(e,s) )
-                nextbb = BoundingBox(Point(float(n_w), float(n_n)),
-                                       Point(float(n_e), float(n_s)))
+                logging.info('NEXT %s' % next_georef)
+                n_w, n_s, n_e, n_n = next_georef.get().bbox
+                resultbb = BoundingBox(Point(w,n), Point(e,s))
+                nextbb = BoundingBox(Point(n_w, n_n),
+                                       Point(n_e, n_s))
                 new_result = resultbb.intersection(nextbb)
                 if new_result is not None:
                     new_results.append(bb_to_georef(new_result))
         results = new_results
+        logging.info("PLEEEEEEEEEEASE %s" % results)
+        results = map(Georef.from_dict, results)
+        ndb.put_multi(results)
+        results = [x.key for x in results]
+    logging.info("WHHHHHAAA %s" % results)
     return results
 
 def parse_loc(loc, loctype):
