@@ -347,13 +347,15 @@ def bb_to_georef(bb):
 
 def clauses_from_locality(location):
     """Return list of Locality objects by splitting location on ',' and ';'."""
-    clauses = [name.strip() for name in set(reduce(
+    clause_names = [name.strip() for name in set(reduce(
                 lambda x, y: x + y,
                 [x.split(';') for x in location.split(',')]))]
-    return clauses
-#    return [Locality(name.strip()) for name in set(reduce(
-#                lambda x, y: x + y,
-#                [x.split(';') for x in location.split(',')]))]
+    normalized_clause_names = []
+    for clause_name in clause_names:
+        tokens = [x.strip() for x in clause_name.split()]
+        new_clause_name = rebuild_from_tokens(retokenize(tokens)).lower().strip()
+        normalized_clause_names.append(new_clause_name) 
+    return normalized_clause_names
 
 def geom_to_bb(geometry):
     ''' Returns a BoundingBox object from a geocode response geometry 
@@ -539,6 +541,9 @@ def parse_loc(loc, loctype):
            }                
    return parts
 
+def rebuild_from_tokens(tokens):
+    return ' '.join(tokens)
+
 def retokenize(tokens):
     newtokens = []
     hasfraction = -1
@@ -552,8 +557,6 @@ def retokenize(tokens):
         for t in test:
             newtokens.append(t)
             i = i + 1
-    if hasfraction == -1:
-        return newtokens
     finaltokens = []
     i = 0
     for token in newtokens:
@@ -562,8 +565,10 @@ def retokenize(tokens):
             finaltokens.append(str(combo))
         elif i == hasfraction:
             pass
-        else:
+        elif is_number(token):
             finaltokens.append(token)
+        else:
+            finaltokens.append(token.strip('.'))
         i = i + 1
     return finaltokens
     
@@ -597,12 +602,18 @@ def separate_numbers_from_strings(token):
     nonnumstr = '' 
     if token[0].isdigit() or isDecimalIndicator(token[0]):
         i = 0
-        while i < len(token) and (token[i].isdigit() or \
-                                   isDecimalIndicator(token[i])):
+        while i < len(token) and \
+            (token[i].isdigit() or \
+             token[i]=='/' or \
+            isDecimalIndicator(token[i])):
             numstr = '%s%s' % (numstr, token[i])
             i += 1
         nonnumstr = right(token, len(token) - i)
-        newtokens.append(numstr)
+        f = get_fraction(numstr)
+        if f is not None:
+            newtokens.append(f)
+        else:
+            newtokens.append(numstr)
         newtokens.append(nonnumstr)
         return newtokens
     # If it isn't a number but ends with a number, return non-number and 
