@@ -1,7 +1,6 @@
 import httplib2
 from apiclient.discovery import build
 from geomancer.model import Cache
-import logging
 
 class Predict(Cache):
 	pass
@@ -26,11 +25,9 @@ def loctype(name, creds, model='loctype'):
 	http = creds.authorize(httplib2.Http())
 	service = build('prediction', 'v1.5', http=http)
 	resp = service.trainedmodels().predict(id=model, body=payload).execute()
-#	logging.info('prediction response %s\n' % resp)
 	prediction = resp['outputLabel']
 	scores = format(resp['outputMulti'])
 	loctype.results = [prediction, scores]
-#	logging.info('loctype.results fresh %s\n' % loctype.results)
 	loctype.put()
 	return loctype.results
 

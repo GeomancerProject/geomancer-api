@@ -61,8 +61,6 @@ class ApiHandler(webapp2.RequestHandler):
             clause_names = core.clauses_from_locality(loc_name)
             clauses = [x for x in map(partial(georef, creds), clause_names) if x]
             ndb.put_multi(clauses)
-            # TODO: Interpreted name should not include anything that was not used 
-            # in the final georeference (omitted clauses).
             loc.interpreted_name = ';'.join([x.interpreted_name for x in clauses])        
             loc.georefs = core.loc_georefs(clauses)
             loc.clauses = [x.key for x in clauses]
