@@ -147,7 +147,9 @@ class BoundingBox(object):
             e=my_e
         if e is None:
             return None
-        return BoundingBox(Point(w,n),Point(e,s))
+        nw = Point(float(truncate(w,DEGREE_DIGITS)),float(truncate(n,DEGREE_DIGITS)))
+        se = Point(float(truncate(e,DEGREE_DIGITS)),float(truncate(s,DEGREE_DIGITS)))
+        return BoundingBox(nw,se)
     
     def center(self):
         return great_circle_midpoint(self.nw,self.se)

@@ -1,8 +1,10 @@
 import math
 import logging
 from geomancer.constants import DistanceUnits, Headings
+from geomancer.model import *
 from geomancer.point import *
 from geomancer.bb import *
+from google.appengine.ext import ndb
 
 def findHeadings(tokens):
     # Don't do anything to change tokens.
@@ -261,6 +263,42 @@ def get_fraction(token):
         return truncate(float(frac[0]) / float(frac[1]), 4)
     return None
 
+def get_georefs_from_parts(parts): 
+    if parts is None:
+        return None
+    feature_geocodes = parts.get('feature_geocodes')
+    if feature_geocodes is None:
+        return None
+    loc_type = parts.get('locality_type')
+    if loc_type is None:
+        return None
+    
+    georefs=[]
+    if loc_type == 'f':
+        for geocode in feature_geocodes.values():
+#            logging.info('GEOCODE %s' % geocode)
+            feature_georefs = get_maps_response_georefs(geocode)
+            for g in feature_georefs:
+                georefs.append(g)
+    elif loc_type == 'foh':
+        for geocode in feature_geocodes.values():
+#            logging.info('GEOCODE %s' % geocode)
+            feature_georefs = get_maps_response_georefs(geocode)
+            for g in feature_georefs:
+                flat = g['lat']
+                flng = g['lng']
+                func = g['uncertainty']
+                offset = parts['offset_value']
+                offsetunit = parts['offset_unit']
+                heading = parts['heading'] 
+                georef = foh_error_point(Point(flng,flat), func, offset, offsetunit, 
+                    heading)
+                if georef is not None:
+                    georefs.append(georef)
+    else:
+        return None
+    return georefs
+
 def get_heading(headingstr):
     """Returns a Heading from a string."""
     h = headingstr.replace('-', '').replace(',', '').strip().lower()
@@ -306,6 +344,18 @@ def bb_to_georef(bb):
               'bounds': bounds
               }
     return georef
+
+def clauses_from_locality(location):
+    """Return list of Locality objects by splitting location on ',' and ';'."""
+    clause_names = [name.strip() for name in set(reduce(
+                lambda x, y: x + y,
+                [x.split(';') for x in location.split(',')]))]
+    normalized_clause_names = []
+    for clause_name in clause_names:
+        tokens = [x.strip() for x in clause_name.split()]
+        new_clause_name = rebuild_from_tokens(retokenize(tokens)).lower().strip()
+        normalized_clause_names.append(new_clause_name) 
+    return normalized_clause_names
 
 def geom_to_bb(geometry):
     ''' Returns a BoundingBox object from a geocode response geometry 
@@ -397,6 +447,36 @@ def left(str, charcount):
         newstr = '%s%s' % (newstr, str[i])
     return new_str
 
+def loc_georefs(clauses):
+    """Get georefs for each Clause in supplied list."""
+    georef_lists = [x.georefs for x in clauses]
+    if len(georef_lists) == 0:
+        return None
+    logging.info('GEOREF_LISTS %s' % georef_lists)
+    results = georef_lists.pop()
+    while len(georef_lists) > 0:
+        new_results = []
+        next_georefs = georef_lists.pop()
+        for result in results:
+            logging.info('RESULT %s' % result)
+            w, s, e, n = result.get().bbox
+            for next_georef in next_georefs:
+                logging.info('NEXT %s' % next_georef)
+                n_w, n_s, n_e, n_n = next_georef.get().bbox
+                resultbb = BoundingBox(Point(w,n), Point(e,s))
+                nextbb = BoundingBox(Point(n_w, n_n),
+                                       Point(n_e, n_s))
+                new_result = resultbb.intersection(nextbb)
+                if new_result is not None:
+                    new_results.append(bb_to_georef(new_result))
+        results = new_results
+        logging.info("PLEEEEEEEEEEASE %s" % results)
+        results = map(Georef.from_dict, results)
+        ndb.put_multi(results)
+        results = [x.key for x in results]
+    logging.info("WHHHHHAAA %s" % results)
+    return results
+
 def parse_loc(loc, loctype):
    parts = {}
    status = ''
@@ -461,6 +541,9 @@ def parse_loc(loc, loctype):
            }                
    return parts
 
+def rebuild_from_tokens(tokens):
+    return ' '.join(tokens)
+
 def retokenize(tokens):
     newtokens = []
     hasfraction = -1
@@ -474,8 +557,6 @@ def retokenize(tokens):
         for t in test:
             newtokens.append(t)
             i = i + 1
-    if hasfraction == -1:
-        return newtokens
     finaltokens = []
     i = 0
     for token in newtokens:
@@ -484,8 +565,10 @@ def retokenize(tokens):
             finaltokens.append(str(combo))
         elif i == hasfraction:
             pass
-        else:
+        elif is_number(token):
             finaltokens.append(token)
+        else:
+            finaltokens.append(token.strip('.'))
         i = i + 1
     return finaltokens
     
@@ -519,12 +602,18 @@ def separate_numbers_from_strings(token):
     nonnumstr = '' 
     if token[0].isdigit() or isDecimalIndicator(token[0]):
         i = 0
-        while i < len(token) and (token[i].isdigit() or \
-                                   isDecimalIndicator(token[i])):
+        while i < len(token) and \
+            (token[i].isdigit() or \
+             token[i]=='/' or \
+            isDecimalIndicator(token[i])):
             numstr = '%s%s' % (numstr, token[i])
             i += 1
         nonnumstr = right(token, len(token) - i)
-        newtokens.append(numstr)
+        f = get_fraction(numstr)
+        if f is not None:
+            newtokens.append(f)
+        else:
+            newtokens.append(numstr)
         newtokens.append(nonnumstr)
         return newtokens
     # If it isn't a number but ends with a number, return non-number and 
