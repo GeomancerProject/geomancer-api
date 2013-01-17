@@ -82,7 +82,10 @@ def _create_locality_csv(loc):
     hdr = 'name,longitude,latitude,uncertainty'
     lines = [hdr]
     for georef in loc.georefs:
-        lines.append(','.join([loc.name, georef.get().csv]))
+		if loc.name.find(',') == -1:
+			lines.append(','.join([loc.name, georef.get().csv]))
+		else:
+			lines.append(','.join(['"%s"' % loc.name, georef.get().csv]))
     return '\n'.join(lines)
 
 class Locality(ndb.Model): # id is name.lower().strip()
