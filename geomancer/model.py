@@ -20,10 +20,10 @@ def _create_georef_csv(georef):
     return ','.join(map(str, [georef.lon, georef.lat, georef.uncertainty]))
 
 class Georef(ndb.Model):
-	lat = ndb.FloatProperty(required=True)
-	lon = ndb.FloatProperty(required=True)
-	uncertainty = ndb.FloatProperty(required=True)
-	bbox = ndb.FloatProperty(repeated=True) # GeoJSON bbox	
+	lat = ndb.FloatProperty(required=True, indexed=False)
+	lon = ndb.FloatProperty(required=True, indexed=False)
+	uncertainty = ndb.FloatProperty(required=True, indexed=False)
+	bbox = ndb.FloatProperty(repeated=True, indexed=False) # GeoJSON bbox	
 	csv = ndb.ComputedProperty(_create_georef_csv, indexed=False)
 	geojson = ndb.JsonProperty()
 
@@ -92,7 +92,7 @@ class Locality(ndb.Model): # id is name.lower().strip()
 	interpreted_name = ndb.StringProperty()
 	clauses = ndb.KeyProperty(kind=Clause, repeated=True)
 	georefs = ndb.KeyProperty(kind=Georef, repeated=True)	
-	csv = ndb.ComputedProperty(_create_locality_csv)
+	csv = ndb.ComputedProperty(_create_locality_csv, indexed=False)
 	json = ndb.JsonProperty()
 
 	def _pre_put_hook(self):
