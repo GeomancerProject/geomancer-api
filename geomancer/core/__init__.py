@@ -617,8 +617,8 @@ def separate_numbers_from_strings(token):
     while i < len(token) and not token[i].isdigit():
         nonnumstr = '%s%s' % (nonnumstr, token[i])
         i += 1
-    numstr = right(tokens, len(token) - i)
-    if is_num(numstr):
+    numstr = right(token, len(token) - i)
+    if is_number(numstr):
         newtokens.append(nonnumstr)
         newtokens.append(numstr)
         return newtokens
