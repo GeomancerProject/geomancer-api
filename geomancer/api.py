@@ -1,11 +1,14 @@
 from geomancer import cdb as cartodb
+import datetime
 import logging
 import json
 import webapp2
 from functools import partial
 from geomancer import predict, parse, geocode, util, core
 from geomancer.model import Locality, Georef, Clause
+from google.appengine.api import mail
 from google.appengine.ext import ndb
+from google.appengine.api import taskqueue
 from google.appengine.ext.webapp.util import run_wsgi_app
 from oauth2client.appengine import CredentialsModel
 from oauth2client.appengine import StorageByKeyName
@@ -41,31 +44,36 @@ def georef(creds, name):
     clause.georefs = [x.key for x in georefs]
     return clause
 
-class ApiHandler(webapp2.RequestHandler):
-    def _get_creds(self):
-        creds = StorageByKeyName(CredentialsModel, 'geomancer-api/1.0', 
-            'credentials').locked_get()
-        if not creds or creds.invalid:
-            raise Exception('missing OAuth 2.0 credentials')
-        return creds
+def process_loc(creds, loc_name):
+    loc = Locality.get_or_insert(loc_name)
+    if not loc.georefs:            
+        clause_names = core.clauses_from_locality(loc_name)
+        clauses = [x for x in map(partial(georef, creds), clause_names) if x]
+        ndb.put_multi(clauses)
+        loc.interpreted_name = ';'.join([x.interpreted_name for x in clauses])        
+        loc.georefs = core.loc_georefs(clauses)
+        loc.clauses = [x.key for x in clauses]
+        loc.put()
+    return loc
 
+def get_creds():
+    creds = StorageByKeyName(CredentialsModel, 'geomancer-api/1.0', 
+        'credentials').locked_get()
+    if not creds or creds.invalid:
+        raise Exception('missing OAuth 2.0 credentials')
+    return creds
+
+class ApiHandler(webapp2.RequestHandler):
+    
     def post(self):
         self.get()
 
     def get(self):
-        creds = self._get_creds()
+        creds = get_creds()
     	loc_name = self.request.get('q')
         format = self.request.get('f', 'json')
         cdb = self.request.get('cdb')
-        loc = Locality.get_or_insert(loc_name)
-        if not loc.georefs:            
-            clause_names = core.clauses_from_locality(loc_name)
-            clauses = [x for x in map(partial(georef, creds), clause_names) if x]
-            ndb.put_multi(clauses)
-            loc.interpreted_name = ';'.join([x.interpreted_name for x in clauses])        
-            loc.georefs = core.loc_georefs(clauses)
-            loc.clauses = [x.key for x in clauses]
-            loc.put()
+        loc = process_loc(creds, loc_name)
         if cdb:
             user, table, api_key = cdb.split(',')
             cartodb.save_results(loc.csv, user, table, api_key)
@@ -80,6 +88,41 @@ class ApiHandler(webapp2.RequestHandler):
             self.response.out.headers['Content-Type'] = 'application/json'
             result = util.dumps(loc)        
     	self.response.out.write(result)
+
+class BulkJob(ndb.Model):
+    data = ndb.TextProperty(required=True)
+    cdb = ndb.StringProperty(required=True) # csv: user,table,api_key
+    email = ndb.StringProperty(required=True)
+    created = ndb.DateTimeProperty(auto_now_add=True)
+    finished = ndb.DateTimeProperty(default=None)
+
+class BulkApi(webapp2.RequestHandler):
+    def get(self):
+        self.post()
+
+    def post(self): 
+        data, cdb, email = map(self.request.get, ['data', 'cdb', 'email'])
+        job = BulkJob(data=data, cdb=cdb, email=email).put()
+        params = dict(job=job.urlsafe())
+        taskqueue.add(url='/api/georef/bulkworker', queue_name='bulk', params=params)        
+
+class BulkWorker(webapp2.RequestHandler):
+    """Idempotent handler for notifying a person of an event."""
+    def post(self): 
+        job = ndb.Key(urlsafe=self.request.get('job')).get()
+        creds = get_creds()
+        if job.finished:
+            return
+        user, table, api_key = job.cdb.split(',')
+        for loc in map(partial(process_loc, creds), iter(job.data.splitlines())):            
+            cartodb.save_results(loc.csv, user, table, api_key)
+        job.finished = datetime.datetime.now()
+        job.put()
+        url = 'http://%s.cartodb.com/tables/%s' % (user, table)
+        message = mail.EmailMessage(
+            sender='noreply@geomancer-api.appspot.com', to=job.email, 
+            subject='Your Geomancer Job is complete!', body=url)
+        message.send()
 
 class StubHandler(webapp2.RequestHandler):
     STUB = {
@@ -114,7 +157,9 @@ class StubHandler(webapp2.RequestHandler):
 
 handler = webapp2.WSGIApplication([
     ('/api/georef', ApiHandler),
-    ('/api/georef/stub', StubHandler)], debug=True)
+    ('/api/georef/stub', StubHandler),
+    ('/api/georef/bulk', BulkApi),
+    ('/api/georef/bulkworker', BulkWorker)], debug=True)
          
 def main():
     run_wsgi_app(handler)
