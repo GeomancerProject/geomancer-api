@@ -17,7 +17,7 @@ class Cache(polymodel.PolyModel):
 
 def _create_georef_csv(georef):
     "Return CSV representation from supplied Georef."
-    return ','.join(map(str, [georef.lon, georef.lat, georef.uncertainty]))
+    return '\t'.join(map(str, [georef.lon, georef.lat, georef.uncertainty]))
 
 class Georef(ndb.Model):
 	lat = ndb.FloatProperty(required=True, indexed=False)
@@ -79,13 +79,10 @@ class Clause(ndb.Model): # id is name.lower().strip()
 
 def _create_locality_csv(loc):
     "Return supplied Locality as a CSV string."
-    hdr = 'name,longitude,latitude,uncertainty'
+    hdr = '\t'.join(['name', 'longitude', 'latitude', 'uncertainty'])
     lines = [hdr]
     for georef in loc.georefs:
-		if loc.name.find(',') == -1:
-			lines.append(','.join([loc.name, georef.get().csv]))
-		else:
-			lines.append(','.join(['"%s"' % loc.name, georef.get().csv]))
+    	lines.append('\t'.join([loc.name, georef.get().csv]))
     return '\n'.join(lines)
 
 class Locality(ndb.Model): # id is name.lower().strip()

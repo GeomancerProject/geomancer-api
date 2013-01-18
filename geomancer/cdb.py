@@ -1,4 +1,5 @@
 from cartodb import CartoDBAPIKey
+import logging
 
 def csv_to_sql(csv, table):
 	"Return supplied CSV converted to SQL INSERT statements."
@@ -6,14 +7,15 @@ def csv_to_sql(csv, table):
 	header = None
 	for line in csv.split('\n'):
 		if not header:
-			header = line
+			header = line.replace('\t', ',')
 			continue
-		line = ','.join(["'%s'" % x for x in line.split(',')])
-		sql = 'INSERT into %s (%s) VALUES (%s);' % (table, header, line)
+		name, longitude, latitude, uncertainty = line.split('\t')
+		vals = "'%s',%s,%s,%s" % (name, longitude, latitude, uncertainty)
+		sql = 'INSERT into %s (%s) VALUES (%s);' % (table, header, vals)
 		statements.append(sql)
 	return '\n'.join(statements)
 
-def save_results(csv, user, api_key, table):	
+def save_results(csv, user, table, api_key):	
 	"Save CSV results to supplied CartoDB table and return table URL."
 	cl = CartoDBAPIKey(api_key, user)
 	cl.sql(csv_to_sql(csv, table))
