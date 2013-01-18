@@ -1,4 +1,4 @@
-from geomancer import cdb
+from geomancer import cdb as cartodb
 import logging
 import json
 import webapp2
@@ -56,6 +56,7 @@ class ApiHandler(webapp2.RequestHandler):
         creds = self._get_creds()
     	loc_name = self.request.get('q')
         format = self.request.get('f', 'json')
+        cdb = self.request.get('cdb')
         loc = Locality.get_or_insert(loc_name)
         if not loc.georefs:            
             clause_names = core.clauses_from_locality(loc_name)
@@ -65,7 +66,11 @@ class ApiHandler(webapp2.RequestHandler):
             loc.georefs = core.loc_georefs(clauses)
             loc.clauses = [x.key for x in clauses]
             loc.put()
-        if format == 'json':
+        if cdb:
+            user, table, api_key = cdb.split(',')
+            cartodb.save_results(loc.csv, user, table, api_key)
+            return
+        elif format == 'json':
             self.response.out.headers['Content-Type'] = 'application/json'
             result = json.dumps(loc.json)
         elif format == 'csv':
@@ -73,7 +78,7 @@ class ApiHandler(webapp2.RequestHandler):
             result = loc.csv
         elif format == 'all':
             self.response.out.headers['Content-Type'] = 'application/json'
-            result = util.dumps(loc)
+            result = util.dumps(loc)        
     	self.response.out.write(result)
 
 class StubHandler(webapp2.RequestHandler):

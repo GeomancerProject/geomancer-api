@@ -452,16 +452,13 @@ def loc_georefs(clauses):
     georef_lists = [x.georefs for x in clauses]
     if len(georef_lists) == 0:
         return None
-    logging.info('GEOREF_LISTS %s' % georef_lists)
     results = georef_lists.pop()
     while len(georef_lists) > 0:
         new_results = []
         next_georefs = georef_lists.pop()
         for result in results:
-            logging.info('RESULT %s' % result)
             w, s, e, n = result.get().bbox
             for next_georef in next_georefs:
-                logging.info('NEXT %s' % next_georef)
                 n_w, n_s, n_e, n_n = next_georef.get().bbox
                 resultbb = BoundingBox(Point(w,n), Point(e,s))
                 nextbb = BoundingBox(Point(n_w, n_n),
@@ -470,11 +467,9 @@ def loc_georefs(clauses):
                 if new_result is not None:
                     new_results.append(bb_to_georef(new_result))
         results = new_results
-        logging.info("PLEEEEEEEEEEASE %s" % results)
         results = map(Georef.from_dict, results)
         ndb.put_multi(results)
         results = [x.key for x in results]
-    logging.info("WHHHHHAAA %s" % results)
     return results
 
 def parse_loc(loc, loctype):
