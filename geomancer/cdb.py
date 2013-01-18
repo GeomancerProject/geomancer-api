@@ -17,10 +17,6 @@ def csv_to_sql(csv, table):
 
 def save_results(csv, user, table, api_key):	
 	"Save CSV results to supplied CartoDB table and return table URL."
-	logging.info(user)
-	logging.info(table)
-	logging.info(api_key)
-
 	cl = CartoDBAPIKey(api_key, user)
 	cl.sql(csv_to_sql(csv, table))
 	return 'http://%s.cartodb.com/tables/%s' % (user, table)

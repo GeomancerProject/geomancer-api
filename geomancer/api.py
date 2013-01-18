@@ -89,7 +89,7 @@ class StubHandler(webapp2.RequestHandler):
       },
       "georefs":[
         {
-          "feadture":{                  
+          "feature":{                  
             "type": "Feature",
             "bbox": [-180.0, -90.0, 180.0, 90.0],
             "geometry": { 
