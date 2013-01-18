@@ -33,8 +33,8 @@ Boom! It's now running locally at [http://localhost:8080](http://localhost:8080)
 
 ## Authentication
 
-Geomancer rides on Google APIs (e.g., Prediction) and it needs to bootstrapped with credentials by accessing [http://localhost:8080/oauth/auth](http://localhost:8080/oauth/auth). Make sure you login as administrator and then click "Allow access". 
+Geomancer rides on Google APIs (e.g., Prediction) and it needs to bootstrapped with credentials by accessing [http://localhost:8080/admin/oauth](http://localhost:8080/admin/oauth). Make sure you login as administrator and then click "Allow access". 
 
 When that's done, you can hit the API!
 
-[http://localhost:8080/api?q=berkeley](http://localhost:8080/api?q=berkeley)
+[http://localhost:8080/api/georef?q=berkeley](http://localhost:8080/api/georef?q=berkeley)
