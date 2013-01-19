@@ -21,12 +21,15 @@ if __name__ == '__main__':
     parser.add_option("-f", "--file", dest="file",
                       help="CSV file of data.",
                       default=None)
+    parser.add_option("-l", "--lang", dest="lang",
+                      help="Language code for file data.",
+                      default=None)    
     (options, args) = parser.parse_args()
 
     client = httplib2.Http()
     data = open(options.file).read()
     body = urllib.urlencode(dict(data=data, cdb=options.cdb, 
-    	email=options.email))
+    	email=options.email, lang=options.lang))
     headers = {'Content-type': 'application/x-www-form-urlencoded'}
     resp, content = client.request(options.url, "POST", body=body, 
     	headers=headers)

@@ -4,6 +4,7 @@ import logging
 import json
 import webapp2
 from functools import partial
+from geomancer import translate
 from geomancer import predict, parse, geocode, util, core
 from geomancer.model import Locality, Georef, Clause
 from google.appengine.api import mail
@@ -44,7 +45,9 @@ def georef(creds, name):
     clause.georefs = [x.key for x in georefs]
     return clause
 
-def process_loc(creds, loc_name):
+def process_loc(creds, lang, loc_name):
+    if lang:
+        loc_name = translate.english(loc_name, lang)
     loc = Locality.get_or_insert(loc_name)
     if not loc.georefs:            
         clause_names = core.clauses_from_locality(loc_name)
@@ -70,29 +73,28 @@ class ApiHandler(webapp2.RequestHandler):
 
     def get(self):
         creds = get_creds()
-    	loc_name = self.request.get('q')
-        format = self.request.get('f', 'json')
-        cdb = self.request.get('cdb')
-        loc = process_loc(creds, loc_name)
+        q, format, cdb, lang = map(self.request.get, ['q', 'f', 'cdb', 'l'])
+        loc = process_loc(creds, lang, q)
         if cdb:
             user, table, api_key = cdb.split(',')
             cartodb.save_results(loc.csv, user, table, api_key)
             return
-        elif format == 'json':
-            self.response.out.headers['Content-Type'] = 'application/json'
-            result = json.dumps(loc.json)
-        elif format == 'csv':
+        if format == 'csv':
             self.response.out.headers['Content-Type'] = 'text/csv'
             result = loc.csv
         elif format == 'all':
             self.response.out.headers['Content-Type'] = 'application/json'
             result = util.dumps(loc)        
+        else: 
+            self.response.out.headers['Content-Type'] = 'application/json'
+            result = json.dumps(loc.json)        
     	self.response.out.write(result)
 
 class BulkJob(ndb.Model):
     data = ndb.TextProperty(required=True)
     cdb = ndb.StringProperty(required=True) # csv: user,table,api_key
     email = ndb.StringProperty(required=True)
+    lang = ndb.StringProperty(default=None)
     created = ndb.DateTimeProperty(auto_now_add=True)
     finished = ndb.DateTimeProperty(default=None)
 
@@ -101,10 +103,12 @@ class BulkApi(webapp2.RequestHandler):
         self.post()
 
     def post(self): 
-        data, cdb, email = map(self.request.get, ['data', 'cdb', 'email'])
-        job = BulkJob(data=data, cdb=cdb, email=email).put()
+        data, cdb, email, lang = map(self.request.get, 
+            ['data', 'cdb', 'email', 'lang'])
+        job = BulkJob(data=data, cdb=cdb, email=email, lang=lang).put()
         params = dict(job=job.urlsafe())
-        taskqueue.add(url='/api/georef/bulkworker', queue_name='bulk', params=params)        
+        taskqueue.add(url='/api/georef/bulkworker', queue_name='bulk', 
+            params=params)        
 
 class BulkWorker(webapp2.RequestHandler):
     """Idempotent handler for notifying a person of an event."""
@@ -114,7 +118,8 @@ class BulkWorker(webapp2.RequestHandler):
         if job.finished:
             return
         user, table, api_key = job.cdb.split(',')
-        for loc in map(partial(process_loc, creds), iter(job.data.splitlines())):            
+        lines = iter(job.data.splitlines())        
+        for loc in map(partial(process_loc, creds, job.lang), lines):
             cartodb.save_results(loc.csv, user, table, api_key)
         job.finished = datetime.datetime.now()
         job.put()
