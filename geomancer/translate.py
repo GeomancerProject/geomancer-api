@@ -11,11 +11,12 @@ service = build('translate', 'v2', developerKey=key)
 class Translation(Cache):
 	pass
 
-def english(q, source):
-	translation = Translation.get_or_insert(q)
+def get(q, source, target):
+	id = '-'.join([source, target, q])
+	translation = Translation.get_or_insert(id)
 	if translation.results:
 		return translation.results
-	request = service.translations().list(source=source, target='en', q=[q])
+	request = service.translations().list(source=source, target=target, q=[q])
 	result = request.execute()
 	logging.info("Translated %s in %s to %s" % (q, source, result))
 	translation.results = result.get('translations')[0].get('translatedText')
