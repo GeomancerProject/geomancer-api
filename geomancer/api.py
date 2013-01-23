@@ -29,7 +29,9 @@ def georef(creds, name):
     if clause.georefs:
         return clause
     loctype, scores = predict.loctype(name, creds)
+    logging.info('PREDICITED LOCTYPE %s' % loctype)
     parts = parse.parts(name, loctype)
+    logging.info('PARSED PARTS %s' % parts)
     if len(parts) == 0:
         return None
     parts['feature_geocodes'] = {}
