@@ -66,9 +66,6 @@ def findNUH(loc):
                         while i < start:
                             rest = (rest + " " + retokens[i]).strip()
                             i = i + 1
-                        if rest != '':
-                            return (offset, units[u]['unit'],
-                                    headings[h]['heading'], rest)
                         i = end + 1
                         while i < numtokens:
                             rest = (rest + " " + retokens[i]).strip()
@@ -77,6 +74,11 @@ def findNUH(loc):
                             return (offset, units[u]['unit'],
                                     headings[h]['heading'], rest)
     return None
+
+def findNUHNUH(loc):
+    nuh = findNUH(loc)
+    nuh2 = findNUH(nuh[3])
+    return (nuh, nuh2)
 
 def findNumbers(tokens):
     # Don't do anything to change tokens.
@@ -169,6 +171,25 @@ def foh_error_point(center, extentstr, offset, offsetunit, heading):
     offsetinmeters = float(offset) * float(fromunit.tometers)    
     newpoint = center.get_point_on_rhumb_line(offsetinmeters, bearing)
     bb = bb_from_pr(newpoint,error)
+    georef = bb_to_georef(bb)
+    return georef
+
+def foo_error_point(center, extentstr, offset0, offsetunit0, heading0, offset1, offsetunit1, heading1):
+    if center is None:
+        return None
+    if extentstr is None:
+        return None
+    extent = get_number(extentstr)
+    error = foo_error(center, extent, offset0, offsetunit0, heading0, offset1, offsetunit1, heading1)
+    bearing0 = float(get_heading(heading0).bearing)
+    bearing1 = float(get_heading(heading1).bearing)
+    fromunit0 = get_unit(offsetunit0)
+    fromunit1 = get_unit(offsetunit1)
+    offsetinmeters0 = float(offset0) * float(fromunit0.tometers)    
+    offsetinmeters1 = float(offset1) * float(fromunit1.tometers)
+    newpoint0 = center.get_point_on_rhumb_line(offsetinmeters0, bearing0)
+    newpoint1 = newpoint0.get_point_on_rhumb_line(offsetinmeters1, bearing1)
+    bb = bb_from_pr(newpoint1,error)
     georef = bb_to_georef(bb)
     return georef
 
@@ -301,6 +322,23 @@ def get_georefs_from_parts(parts):
                 heading = parts['heading'] 
                 georef = foh_error_point(Point(flng,flat), func, offset, offsetunit, 
                     heading)
+                if georef is not None:
+                    georefs.append(georef)
+    elif loc_type == 'foo':
+        for geocode in feature_geocodes.values():
+            feature_georefs = get_maps_response_georefs(geocode)
+            for g in feature_georefs:
+                flat = g['lat']
+                flng = g['lng']
+                func = g['uncertainty']
+                offset0 = parts['offset_value0']
+                offsetunit0 = parts['offset_unit0']
+                heading0 = parts['heading0'] 
+                offset1 = parts['offset_value1']
+                offsetunit1 = parts['offset_unit1']
+                heading1 = parts['heading1'] 
+                georef = foo_error_point(Point(flng,flat), func, offset0, offsetunit0, 
+                    heading0, offset1, offsetunit1, heading1)
                 if georef is not None:
                     georefs.append(georef)
     else:
@@ -491,68 +529,119 @@ def nf_error_point(center, extentstr):
     return georef
 
 def parse_loc(loc, loctype):
-   parts = {}
-   status = ''
-   if loctype.lower() == 'f' or loctype.lower() == 'nf':
-       if len(loc) == 0:
-           logging.info('No feature found in %s' % loc)
-           status = 'No feature'
+    parts = {}
+    if loctype.lower() == 'f' or loctype.lower() == 'nf':
+        parts = parse_loc_f(loc,loctype)
+    if loctype.lower() == 'foh':
+        parts = parse_loc_foh(loc,loctype)
+    if loctype.lower() == 'foo':
+        parts = parse_loc_foo(loc,loctype)
+    return parts
 
-       # Try to construct a Feature from the remainder
-       features = []
-       feature = loc.strip()
-       features.append(feature)
-       if len(status) == 0:
-           status = 'complete'
-           interpreted_loc = feature
-       parts = {
-           'verbatim_loc': loc,
-           'locality_type': loctype,
-           'features': features,
-           'feature_geocodes': None,
-           'interpreted_loc': interpreted_loc,
-           'status': status
-           }                
-       
-   if loctype.lower() == 'foh':
-       # TODO: Start with what you know - find unit. Unit should be followed 
-       # by heading and preceded by distance.
-       nuh = findNUH(loc)
-       if nuh is None:
-           # Most common form is number, unit, heading. Try this first. 
-           # If this combo is not found, do further processing. Return None 
-           # if an FOH can not be formed.
-           return None
-       status = 'nuh complete'
+def parse_loc_f(loc, loctype):
+    if len(loc) == 0:
+        logging.info('No feature found in %s' % loc)
+        status = 'No feature'
+    parts = {}
+    status = ''
+    features = []
+    feature = loc.strip()
+    features.append(feature)
+    if len(status) == 0:
+        status = 'complete'
+        interpreted_loc = feature
+    parts = {
+        'verbatim_loc': loc,
+        'locality_type': loctype,
+        'features': features,
+        'feature_geocodes': None,
+        'interpreted_loc': interpreted_loc,
+        'status': status
+        }
+    return parts
 
-       # Try to construct a Feature from the remainder
-       features = []
-       offsetval = nuh[0]
-       offsetunit = nuh[1]
-       heading = nuh[2]
-       feature = nuh[3]
-       feature = feature.strip()
-       # Strip "stop" words off the beginning of the the putative feature
-       fsplit = feature.split()
-       if len(fsplit) > 1:
-           stop_words = ['of', 'from', 'to']
-           if fsplit[0].lower() in stop_words:
-               feature = feature.lstrip(fsplit[0]).strip()
-       features.append(feature)
-       status = 'complete'
-       interpreted_loc = '%s %s %s %s' % (offsetval, offsetunit, heading, feature)
-       parts = {
-           'verbatim_loc': loc,
-           'locality_type': loctype,
-           'offset_value': offsetval,
-           'offset_unit': offsetunit,
-           'heading': heading,
-           'features': features,
-           'feature_geocodes': None,
-           'interpreted_loc': interpreted_loc,
-           'status': status
-           }                
-   return parts
+def parse_loc_foh(loc,loctype):
+    # Find a number unit heading combination.
+    nuh = findNUH(loc)
+    if nuh is None:
+        # Most common form is number, unit, heading. Try this first. 
+        # If this combo is not found, do further processing. Return None 
+        # if an FOH can not be formed.
+        return None
+    status = 'nuh complete'
+    
+    # Try to construct a Feature from the remainder
+    features = []
+    offsetval = nuh[0]
+    offsetunit = nuh[1]
+    heading = nuh[2]
+    feature = nuh[3]
+    feature = feature.strip()
+    # Strip "stop" words off the beginning of the the putative feature
+    fsplit = feature.split()
+    if len(fsplit) > 1:
+        stop_words = ['of', 'from', 'to']
+        if fsplit[0].lower() in stop_words:
+            feature = feature.lstrip(fsplit[0]).strip()
+    features.append(feature)
+    status = 'complete'
+    interpreted_loc = '%s %s %s of %s' % (offsetval, offsetunit, heading, feature)
+    parts = {
+        'verbatim_loc': loc,
+        'locality_type': loctype,
+        'offset_value': offsetval,
+        'offset_unit': offsetunit,
+        'heading': heading,
+        'features': features,
+        'feature_geocodes': None,
+        'interpreted_loc': interpreted_loc,
+        'status': status
+        }                
+    return parts
+
+def parse_loc_foo(loc,loctype):
+    # Find a number unit heading combination.
+    nuh = findNUHNUH(loc)
+    if nuh is None:
+        return None
+    status = 'nuhnuh complete'
+    
+    # Try to construct a Feature from the remainder
+    features = []
+    offsetval0 = nuh[0][0]
+    offsetunit0 = nuh[0][1]
+    heading0 = nuh[0][2]
+    offsetval1 = nuh[1][0]
+    offsetunit1 = nuh[1][1]
+    heading1 = nuh[1][2]
+    feature = nuh[1][3]
+    
+    feature = feature.strip()
+    # Strip "stop" words off the beginning of the the putative feature
+    fsplit = feature.split()
+    if len(fsplit) > 1:
+        stop_words = ['and', 'of', 'from', 'to']
+        while fsplit[0].lower() in stop_words:
+            feature = feature.lstrip(fsplit[0]).strip()
+            fsplit = feature.split()
+    features.append(feature)
+    status = 'complete'
+    interpreted_loc = '%s %s %s and %s %s %s of %s' % (offsetval0, offsetunit0, heading0, offsetval1, offsetunit1, heading1, feature)
+    parts = {
+        'verbatim_loc': loc,
+        'locality_type': loctype,
+        'offset_value0': offsetval0,
+        'offset_unit0': offsetunit0,
+        'heading0': heading0,
+        'offset_value1': offsetval1,
+        'offset_unit1': offsetunit1,
+        'heading1': heading1,
+        'features': features,
+        'feature_geocodes': None,
+        'interpreted_loc': interpreted_loc,
+        'status': status
+        }                
+    return parts
 
 def pr_to_georef(center, radius):
     if center is None:
