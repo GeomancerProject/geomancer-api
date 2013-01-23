@@ -18,7 +18,7 @@ def normalize(name):
     "Return the normalized version of supplied name."
     return name.lower().strip()
 
-def georef(creds, name):
+def georef(creds, lang, name):
     """Return a georeferenced Clause model from supplied clause name. The Clause
     will be populated with name, normalized_name, interpreted_name, loctype, parts,
     and georefs but it will not be saved. This is an optimization so that multiple
@@ -29,14 +29,14 @@ def georef(creds, name):
     if clause.georefs:
         return clause
     loctype, scores = predict.loctype(name, creds)
-    logging.info('PREDICITED LOCTYPE %s' % loctype)
     parts = parse.parts(name, loctype)
-    logging.info('PARSED PARTS %s' % parts)
     if len(parts) == 0:
         return None
     parts['feature_geocodes'] = {}
     for feature in parts['features']:
-        parts['feature_geocodes'][feature] = geocode.lookup(normalize(feature))
+        if lang:
+            feature_trans = translate.get(feature, 'en', lang)
+        parts['feature_geocodes'][feature] = geocode.lookup(normalize(feature_trans))
     georefs = map(Georef.from_dict, core.get_georefs_from_parts(parts))
     if len(georefs) == 0:
         return None
@@ -49,14 +49,15 @@ def georef(creds, name):
 
 def process_loc(creds, lang, loc_name):
     if lang:
-        loc_name = translate.english(loc_name, lang)
+        loc_name = translate.get(loc_name, lang, 'en')
     loc = Locality.get_or_insert(loc_name)
     if not loc.georefs:            
         clause_names = core.clauses_from_locality(loc_name)
-        clauses = [x for x in map(partial(georef, creds), clause_names) if x]
+        clauses = [x for x in map(partial(georef, creds, lang), clause_names) \
+                   if x]
         ndb.put_multi(clauses)
         loc.interpreted_name = ';'.join([x.interpreted_name for x in clauses])        
-        loc.georefs = core.loc_georefs(clauses)
+        loc.georefs = core.loc_georefs(clauses) or []
         loc.clauses = [x.key for x in clauses]
         loc.put()
     return loc
@@ -90,7 +91,7 @@ class ApiHandler(webapp2.RequestHandler):
         else: 
             self.response.out.headers['Content-Type'] = 'application/json'
             result = json.dumps(loc.json)        
-    	self.response.out.write(result)
+        self.response.out.write(result)
 
 class BulkJob(ndb.Model):
     data = ndb.TextProperty(required=True)
