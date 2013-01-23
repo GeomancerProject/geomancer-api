@@ -276,13 +276,21 @@ def get_georefs_from_parts(parts):
     georefs=[]
     if loc_type == 'f':
         for geocode in feature_geocodes.values():
-#            logging.info('GEOCODE %s' % geocode)
             feature_georefs = get_maps_response_georefs(geocode)
             for g in feature_georefs:
                 georefs.append(g)
+    elif loc_type == 'nf':
+        for geocode in feature_geocodes.values():
+            feature_georefs = get_maps_response_georefs(geocode)
+            for g in feature_georefs:
+                flat = g['lat']
+                flng = g['lng']
+                func = g['uncertainty']
+                georef = nf_error_point(Point(flng,flat), func)
+                if georef is not None:
+                    georefs.append(georef)
     elif loc_type == 'foh':
         for geocode in feature_geocodes.values():
-#            logging.info('GEOCODE %s' % geocode)
             feature_georefs = get_maps_response_georefs(geocode)
             for g in feature_georefs:
                 flat = g['lat']
@@ -472,10 +480,20 @@ def loc_georefs(clauses):
         results = [x.key for x in results]
     return results
 
+def nf_error_point(center, extentstr):
+    if center is None:
+        return None
+    if extentstr is None:
+        return None
+    error = get_number(extentstr) + 2000
+    bb = bb_from_pr(center,error)
+    georef = pr_to_georef(center, error)
+    return georef
+
 def parse_loc(loc, loctype):
    parts = {}
    status = ''
-   if loctype.lower() == 'f':
+   if loctype.lower() == 'f' or loctype.lower() == 'nf':
        if len(loc) == 0:
            logging.info('No feature found in %s' % loc)
            status = 'No feature'
@@ -535,6 +553,24 @@ def parse_loc(loc, loctype):
            'status': status
            }                
    return parts
+
+def pr_to_georef(center, radius):
+    if center is None:
+        return None
+    
+    ne = center.get_point_on_rhumb_line(radius, 45)
+    sw = center.get_point_on_rhumb_line(radius, 225)
+    bounds = {
+              'northeast': {'lat': ne.lat, 'lng': ne.lng },
+              'southwest': {'lat': sw.lat, 'lng': sw.lng }
+              }
+    georef = {
+              'lat': center.lat,
+              'lng': center.lng,
+              'uncertainty': radius,
+              'bounds': bounds
+              }
+    return georef
 
 def rebuild_from_tokens(tokens):
     return ' '.join(tokens)
