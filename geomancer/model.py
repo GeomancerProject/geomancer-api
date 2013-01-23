@@ -69,7 +69,7 @@ class Clause(ndb.Model): # id is name.lower().strip()
 	@classmethod
 	def get_by_id(cls, name):
 		"Return Wallet identified by supplied person and shell."
-		return super(Clause, cls).get_by_id(cls.normalized_name(name))
+		return super(Clause, cls).get_by_id(cls.normalize_name(name))
 
 	@classmethod
 	def get_or_insert(cls, name):

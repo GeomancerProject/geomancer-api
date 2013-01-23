@@ -11,7 +11,7 @@ def lookup(feature):
     geocode = Geocode.get_or_insert(feature)
     if geocode.results:
         return geocode.results
-    params = urllib.urlencode([('address', feature), ('sensor', 'false')])
+    params = urllib.urlencode([('address', feature.encode('utf-8')), ('sensor', 'false')])
     url = 'http://maps.googleapis.com/maps/api/geocode/json?%s' % params
     geocode.results = json.loads(urlfetch.fetch(url).content)
     geocode.put()
