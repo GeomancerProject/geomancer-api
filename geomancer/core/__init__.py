@@ -174,6 +174,49 @@ def foh_error_point(center, extentstr, offset, offsetunit, heading):
     georef = bb_to_georef(bb)
     return georef
 
+def foo_error(point, extent, offsetstr0, offsetunits0, headingstr0, offsetstr1, offsetunits1, headingstr1):
+    """ Returns the radius in meters from a Point containing all of the 
+        uncertainties for a Locality of type Feature Offset Heading.
+    
+    Arguments:
+        point - the center of the feature in the Locality
+        extent - the radius from the center of the Feature to the furthest 
+                 corner of the bounding box containing the feature, in meters
+        offset0 - the distance from the center of the feature, as a string
+        offsetunits0 - the units of the offset
+        headingstr0 - the direction from the feature to the location
+        offset1 - the orthogonal distance from the center of the feature, as a string
+        offsetunits1 - the orthogonal units of the offset
+        headingstr1 - the orthogonal direction from the feature to the location
+        
+    Note: all sources for error are shown, though some do not apply under 
+    the assumption of using the Google Geocoding API to get the feature 
+    information."""
+    # error in meters
+    error = 0
+    # No datum error - always WGS84
+#      error += datumError(datum, point)
+    # No source error from Maps Geocoding API
+#      error += sourceError(source)
+    error += extent
+    # offset must be a string in this call
+    distprecision0 = getDistancePrecision(offsetstr0)
+    distprecision1 = getDistancePrecision(offsetstr1)
+    fromunit0 = get_unit(offsetunits0)
+    fromunit1 = get_unit(offsetunits1)
+    # distance precision in meters
+    dpm0 = distprecision0 * float(fromunit0.tometers)
+    dpm1 = distprecision1 * float(fromunit1.tometers)
+    if dpm0 >= dpm1:
+        error += dpm0*math.sqrt(2)
+    else:
+        error += dpm1*math.sqrt(2)
+    # No error from direction precision. Orthogonals are assumed to be exact.
+    # No coordinate error from Maps Geocoding API - more than six digits 
+    # retained
+#    error += coordinatesPrecisionError(coordinates)
+    return int(error)
+
 def foo_error_point(center, extentstr, offset0, offsetunit0, heading0, offset1, offsetunit1, heading1):
     if center is None:
         return None
