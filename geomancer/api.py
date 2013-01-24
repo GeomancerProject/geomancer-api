@@ -36,8 +36,10 @@ def georef(creds, lang, name):
     for feature in parts['features']:
         if lang:
             feature_trans = translate.get(feature, 'en', lang)
-            logging.info('%s %s' % (feature, feature_trans))
-        parts['feature_geocodes'][feature] = geocode.lookup(normalize(feature_trans))
+            logging.info('WHAT %s %s' % (feature, feature_trans))
+            parts['feature_geocodes'][feature] = geocode.lookup(normalize(feature_trans))
+        else:
+            parts['feature_geocodes'][feature] = geocode.lookup(normalize(feature))
     georefs = map(Georef.from_dict, core.get_georefs_from_parts(parts))
     if len(georefs) == 0:
         return None
