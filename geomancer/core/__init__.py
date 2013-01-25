@@ -6,6 +6,35 @@ from geomancer.point import *
 from geomancer.bb import *
 from google.appengine.ext import ndb
 
+def findBF(loc):
+    tokens = [x.strip() for x in loc.split()]
+    # Strip "stop" words off the beginning of the putative feature
+    # Find the position of the "between" token
+    bpos = first_substring(tokens, 'between')
+    if bpos == -1:
+        bpos = first_substring(tokens, 'from')
+        if bpos == -1:
+            return None
+    # Find the position of the "and" token
+    apos = first_substring(tokens, 'and')
+    if apos == -1:
+        apos = first_substring(tokens, 'to')
+        if apos == -1:
+            return None
+    # First feature begins after the "between" token
+    # Ignore everything up through this token
+    f1 =  ''
+    f2 = ''
+    i = bpos + 1
+    while i < apos:
+        f1 = '%s %s' % (f1,tokens[i])
+        i += 1
+    i = apos + 1
+    while i < len(tokens):
+        f2 = '%s %s' % (f2,tokens[i])
+        i += 1
+    return [f1.strip(), f2.strip()]
+
 def findHeadings(tokens):
     # Don't do anything to change tokens.
     # headings: list of tuples of form
@@ -121,6 +150,14 @@ def findUnits(tokens):
             units.append((i, unit.name, 1))
         i += 1
     return units
+
+def first_substring(strings, substring):
+    i=0
+    for string in strings:
+        if string==substring:
+            return i
+        i+=1
+    return -1 
 
 def foh_error(point, extent, offsetstr, offsetunits, headingstr):
     """ Returns the radius in meters from a Point containing all of the 
@@ -343,6 +380,38 @@ def get_georefs_from_parts(parts):
             feature_georefs = get_maps_response_georefs(geocode)
             for g in feature_georefs:
                 georefs.append(g)
+    elif loc_type == 'bf':
+        # Make a list of georef lists - one for each of the two features
+        featuregeorefs = []
+        # For each feature, get its listof geocodes, then make the georefs
+        # of those geocodes and put the list of those into the georefs list
+        # georefs = [ [georefs for feature0], [georefs for feature1] ]
+        for feature in feature_geocodes:
+            geocodes = feature_geocodes[feature]
+            featuregeorefs.append(get_maps_response_georefs(geocodes))
+        # Make between feature georefs for every combination of the 
+        # features. Use only the nearest combinations of each feature-feature
+        # permutation.
+        for georef0 in featuregeorefs[0]:
+            lat0 = georef0['lat']
+            lng0 = georef0['lng']
+            p0 = Point(lng0,lat0)
+            center = None
+            # don't consider features further apart than 100 km
+            min_distance_between = 100000
+            for georef1 in featuregeorefs[1]:
+                lat1 = georef1['lat']
+                lng1 = georef1['lng']
+                p1 = Point(lng1,lat1)
+                dist = p0.haversine_distance(p1)
+                if dist < min_distance_between:
+                    min_distance_between = dist
+                    center = great_circle_midpoint(p0,p1)
+            # Now we have the nearest combo
+            if center is not None:
+                bb = bb_from_pr(center,min_distance_between/2)
+                georef = bb_to_georef(bb)
+                georefs.append(georef)
     elif loc_type == 'nf':
         for geocode in feature_geocodes.values():
             feature_georefs = get_maps_response_georefs(geocode)
@@ -575,10 +644,30 @@ def parse_loc(loc, loctype):
     parts = {}
     if loctype.lower() == 'f' or loctype.lower() == 'nf':
         parts = parse_loc_f(loc,loctype)
+    if loctype.lower() == 'bf':
+        parts = parse_loc_bf(loc,loctype)
     if loctype.lower() == 'foh':
         parts = parse_loc_foh(loc,loctype)
     if loctype.lower() == 'foo':
         parts = parse_loc_foo(loc,loctype)
+    return parts
+
+def parse_loc_bf(loc, loctype):
+    if len(loc) < 4:
+        status = 'Not a valid between features locality'
+    features = findBF(loc)
+    if features is None:
+        return None
+    status = 'complete'
+    interpreted_loc = 'between %s and %s' % (features[0], features[1])
+    parts = {
+        'verbatim_loc': loc,
+        'locality_type': loctype,
+        'features': features,
+        'feature_geocodes': None,
+        'interpreted_loc': interpreted_loc,
+        'status': status
+        }                
     return parts
 
 def parse_loc_f(loc, loctype):
