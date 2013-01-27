@@ -7,6 +7,7 @@ from functools import partial
 from geomancer import translate
 from geomancer import predict, parse, geocode, util, core
 from geomancer.model import Locality, Georef, Clause
+from geomancer.geocode import Geocode
 from google.appengine.api import mail
 from google.appengine.ext import ndb
 from google.appengine.api import taskqueue
@@ -136,6 +137,16 @@ class BulkWorker(webapp2.RequestHandler):
             subject='Your Geomancer Job is complete!', body=url)
         message.send()
 
+class CacheWorker(webapp2.RequestHandler):
+    """Bulkloads Cache models to datastore."""
+    def post(self):
+        data = self.request.get('data')
+        kind = self.request.get('kind')        
+        if kind == 'Geocode':
+            models = map(Geocode.from_line, data.splitlines())
+        ndb.put_multi(models)
+        self.response.out.status = 201
+
 class StubHandler(webapp2.RequestHandler):
     STUB = {
       "locality":{
@@ -170,6 +181,7 @@ class StubHandler(webapp2.RequestHandler):
 handler = webapp2.WSGIApplication([
     ('/api/georef', ApiHandler),
     ('/api/georef/stub', StubHandler),
+    ('/api/cache/bulk', CacheWorker),
     ('/api/georef/bulk', BulkApi),
     ('/api/georef/bulkworker', BulkWorker)], debug=True)
          
