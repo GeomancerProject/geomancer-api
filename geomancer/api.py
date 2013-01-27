@@ -34,14 +34,13 @@ def georef(creds, lang, name):
     logging.info('LOCTYPE SCORES: %s\n %s\n PARTS:\n %s\n' % (loctype, scores, parts))
     if len(parts) == 0:
         return None
-    parts['feature_geocodes'] = {}
-    for feature in parts['features']:
-        if lang:
-            feature_trans = translate.get(feature, 'en', lang)
-            logging.info('WHAT %s %s' % (feature, feature_trans))
-            parts['feature_geocodes'][feature] = geocode.lookup(normalize(feature_trans))
-        else:
-            parts['feature_geocodes'][feature] = geocode.lookup(normalize(feature))
+    features = parts['features']
+    if lang:        
+        features_trans = translate.get(features, 'en', lang)
+        geocodes = geocode.lookup(map(normalize, features_trans))
+    else:
+        geocodes = geocode.lookup(map(normalize, features))
+    parts['feature_geocodes'] = apply(dict, [zip(features, geocodes)])
     georefs = map(Georef.from_dict, core.get_georefs_from_parts(parts))
     if len(georefs) == 0:
         return None
