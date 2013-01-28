@@ -1,40 +1,13 @@
-# Developing
+# What is Geomancer?
 
-Here are some details about developing the Geomancer API.
+Geomancer is an API for georeferencing localities using the [point-radius method](http://herpnet.org/herpnet/documents/wieczorek.pdf). Basically it converts a description of a place, like "5 miles west of Berkeley", into a geocoded location with coordinates, a bounding box, and an uncertainty value. 
 
-## Getting the code
+# Motivation
 
-Make sure you have Git installed, and then from the command line:
+Over the past 250 years, biologists have gone into the field to collect specimens and associated environmental information documenting the range of life. The results of these explorations are an irreplaceable archive of Earth's biological diversity that plays a fundamental role in generating new knowledge and guiding conservation decisions. Yet, roughly one billion specimen records, and even more species observation records, remain practically unusable in their current form. 
 
-```bash
-$ git clone git@github.com:GeomancerProject/geomancer-api.git
-```
+Georeferenced biocollection data is in high demand. Mapping species occurrence data is fundamental to describing and analysing biotic distributions. This information is also critical for conservation planning, reserving selection, monitoring, and the examination of the potential effects of climate change on biodiversity. 
 
-That will download the full code repository into a directory named `geomancer-api`.
+Increasing the availability of georeferenced species distribution data will vastly increase our ability to understand patterns of biodiversity and to make balanced conservation-related decisions. Most data in these analyses come from natural history collections, which provide unique and irreplaceable information, especially for areas that have undergone habitat change due to clearing for agriculture or ubanization. 
 
-## Dev server
-
-The Geomancer API rides on [Google App Engine](https://developers.google.com/appengine) Python 2.7 runtime, so you'll need to [download and install](https://developers.google.com/appengine/downloads) the latest Python SDK. 
-
-It's useful adding the SDK to your PATH by adding the following line to your `~/.bashrc` or `~/.bash_profile`:
-
-```bash
-export PATH=$PATH:/your/path/to/google_appengine_sdk
-```
-
-App Engine ships with a local development server. At the command line:
-
-```bash
-$ cd geomancer-api
-$ dev_appserver.py --clear_search_index --high_replication --use_sqlite -c .
-```
-
-Boom! It's now running locally at [http://localhost:8080](http://localhost:8080) and you get an admin console at [http://localhost:8080/_ah/admin](http://localhost:8080/_ah/admin).
-
-## Authentication
-
-Geomancer rides on Google APIs (e.g., Prediction) and it needs to bootstrapped with credentials by accessing [http://localhost:8080/admin/oauth](http://localhost:8080/admin/oauth). Make sure you login as administrator and then click "Allow access". 
-
-When that's done, you can hit the API!
-
-[http://localhost:8080/api/georef?q=berkeley](http://localhost:8080/api/georef?q=berkeley)
+The BioGeomancer research consortium is coordinated by the University of California at Berkeley and is developing a universal system for georeferencing the diverse specimen records in natural history collections.
