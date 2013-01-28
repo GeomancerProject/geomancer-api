@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Geocoding service."""
+"""Geocoding service using parallel async urlfetching."""
 
 import json
 import urllib
@@ -25,16 +25,31 @@ class Geocode(Cache):
 
 def get_url(feature):
     params = [('address', feature.encode('utf-8')), ('sensor', 'false')]
-    encoded_params = urllib.urlencode(params)
-    url = 'http://maps.googleapis.com/maps/api/geocode/json?%s' % encoded_params
+    params_encoded = urllib.urlencode(params)
+    return 'http://maps.googleapis.com/maps/api/geocode/json?%s' % params_encoded
+
+def launch_rpc(feature):
+    url = get_url(feature)   
+    rpc = urlfetch.create_rpc()
+    return urlfetch.make_fetch_call(rpc, url)
 
 def lookup(features):
-    """Return geocode results for supplied feature name."""    
-    geocode = Geocode.get_or_insert(feature)
-    if geocode.results:
-        return geocode.results
-    params = urllib.urlencode([('address', feature.encode('utf-8')), ('sensor', 'false')])
-    url = 'http://maps.googleapis.com/maps/api/geocode/json?%s' % params
-    geocode.results = json.loads(urlfetch.fetch(url).content)
-    geocode.put()
-    return geocode.results
+    """Return dict {'name': geocode} results for supplied list of feature names."""        
+    results = apply(dict, [zip(features, ['' for x in features])])
+    for feature in features:
+        geocode = Geocode.get_or_insert(feature)
+        if geocode.results:
+            results[feature] = geocode
+        else:
+            results[feature] = (geocode, launch_rpc(feature))
+    geocodes = {}
+    for feature, val in results.iteritems():
+        if type(val) == Geocode:
+            geocodes[feature] = val.results
+        else:
+            geocode, rpc = val
+            geocode.results = json.loads(rpc.get_result().content)
+            geocodes[feature] = geocode.results
+            geocode.put()
+    return geocodes
+

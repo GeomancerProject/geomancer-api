@@ -31,7 +31,6 @@ def georef(creds, lang, name):
         return clause
     loctype, scores = predict.loctype(name, creds)
     parts = parse.parts(name, loctype)
-    logging.info('LOCTYPE SCORES: %s\n %s\n PARTS:\n %s\n' % (loctype, scores, parts))
     if len(parts) == 0:
         return None
     features = parts['features']
@@ -40,7 +39,7 @@ def georef(creds, lang, name):
         geocodes = geocode.lookup(map(normalize, features_trans))
     else:
         geocodes = geocode.lookup(map(normalize, features))
-    parts['feature_geocodes'] = apply(dict, [zip(features, geocodes)])
+    parts['feature_geocodes'] = geocodes
     georefs = map(Georef.from_dict, core.get_georefs_from_parts(parts))
     if len(georefs) == 0:
         return None
@@ -97,6 +96,15 @@ class ApiHandler(webapp2.RequestHandler):
             result = json.dumps(loc.json)        
         self.response.out.write(result)
 
+class GeocodeHandler(webapp2.RequestHandler):
+    def get(self):
+        self.post()
+
+    def post(self): 
+        features = self.request.get('f').split(',')
+        self.response.out.headers['Content-Type'] = 'application/json'
+        self.response.out.write(json.dumps(geocode.lookup(features)))
+
 class BulkJob(ndb.Model):
     data = ndb.TextProperty(required=True)
     cdb = ndb.StringProperty(required=True) # csv: user,table,api_key
@@ -115,7 +123,7 @@ class BulkApi(webapp2.RequestHandler):
         job = BulkJob(data=data, cdb=cdb, email=email, lang=lang).put()
         params = dict(job=job.urlsafe())
         taskqueue.add(url='/api/georef/bulkworker', queue_name='bulk', 
-            params=params)        
+            params=params)            
 
 class BulkWorker(webapp2.RequestHandler):
     """Idempotent handler for notifying a person of an event."""
@@ -179,6 +187,7 @@ class StubHandler(webapp2.RequestHandler):
 
 handler = webapp2.WSGIApplication([
     ('/api/georef', ApiHandler),
+    ('/api/geocode', GeocodeHandler),    
     ('/api/georef/stub', StubHandler),
     ('/api/cache/bulk', CacheWorker),
     ('/api/georef/bulk', BulkApi),

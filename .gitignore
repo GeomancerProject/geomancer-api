@@ -1,6 +1,6 @@
 data/*.csv
 *.py[cod]
-
+data/*.csv
 # C extensions
 *.so
 
