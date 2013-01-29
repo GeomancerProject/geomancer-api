@@ -17,6 +17,7 @@
 import json
 import urllib
 from google.appengine.api import urlfetch
+from google.appengine.ext import ndb
 from geomancer.model import Cache
 
 class Geocode(Cache):
@@ -36,20 +37,26 @@ def launch_rpc(feature):
 def lookup(features):
     """Return dict {'name': geocode} results for supplied list of feature names."""        
     results = apply(dict, [zip(features, ['' for x in features])])
+    to_put = []
     for feature in features:
         geocode = Geocode.get_or_insert(feature)
-        if geocode.results:
+        if geocode.results and geocode.results.has_key('google-geocode-api'):
             results[feature] = geocode
         else:
             results[feature] = (geocode, launch_rpc(feature))
     geocodes = {}
     for feature, val in results.iteritems():
-        if type(val) == Geocode:
+        if isinstance(val, Geocode):
             geocodes[feature] = val.results
         else:
             geocode, rpc = val
-            geocode.results = json.loads(rpc.get_result().content)
+            result = json.loads(rpc.get_result().content)            
+            if not geocode.results:
+                geocode.results = {'google-geocode-api': result}
+            else:
+                geocode.results['google-geocode-api'] = result
             geocodes[feature] = geocode.results
-            geocode.put()
+            to_put.append(geocode)
+    ndb.put_multi(to_put)
     return geocodes
 

@@ -156,10 +156,9 @@ class BulkWorker(webapp2.RequestHandler):
 class CacheWorker(webapp2.RequestHandler):
     """Bulkloads Cache models to datastore."""
     def post(self):
-        data = self.request.get('data')
-        kind = self.request.get('kind')        
+        data, source, kind = map(self.request.get, ['data', 'source', 'kind'])
         if kind == 'Geocode':
-            models = map(Geocode.from_line, data.splitlines())
+            models = map(partial(Geocode.from_line, source), data.splitlines())
         ndb.put_multi(models)
         self.response.out.status = 201
 

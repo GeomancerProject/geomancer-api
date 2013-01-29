@@ -28,6 +28,7 @@ def loctype(name, creds, model='loctype'):
 	prediction = resp['outputLabel']
 	scores = format(resp['outputMulti'])
 	loctype.results = [prediction, scores]
+	loctype.source = 'google-prediction-api'
 	loctype.put()
 	return loctype.results
 
