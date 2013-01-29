@@ -61,7 +61,7 @@ class FlushHandler(webapp2.RequestHandler):
 		from google.appengine.ext import ndb
 		from google.appengine.api import memcache
 		for x in [Cache, Locality, Clause, Georef]:
-			ndb.delete_multi(x.query().fetch(keys_only=True))
+			ndb.delete_multi(x.query().iter(keys_only=True))
 		memcache.flush_all()
 
 handler = webapp2.WSGIApplication(
