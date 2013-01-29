@@ -9,7 +9,7 @@ builtins:
 
 handlers:
 
-- url: /api/.*
+- url: /api.*
   script: geomancer.api.handler
 
 - url: /admin/.*

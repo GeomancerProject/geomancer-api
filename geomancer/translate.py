@@ -20,5 +20,6 @@ def get(q, source, target):
 	result = request.execute()
 	logging.info("Translated %s in %s to %s" % (q, source, result))
 	translation.results = result.get('translations')[0].get('translatedText')
+	translation.source = 'google-translation-api'
 	translation.put()
 	return translation.results
