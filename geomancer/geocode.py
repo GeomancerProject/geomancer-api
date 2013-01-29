@@ -22,7 +22,7 @@ from geomancer.model import Cache
 
 class Geocode(Cache):
     """Cache model for geocode results."""
-    pass
+    has_google_results = ndb.BooleanProperty(default=False)
 
 def get_url(feature):
     params = [('address', feature.encode('utf-8')), ('sensor', 'false')]
@@ -40,7 +40,7 @@ def lookup(features):
     to_put = []
     for feature in features:
         geocode = Geocode.get_or_insert(feature)
-        if geocode.results and geocode.results.has_key('google-geocode-api'):
+        if geocode.results and geocode.has_google_results:
             results[feature] = geocode
         else:
             results[feature] = (geocode, launch_rpc(feature))
@@ -52,10 +52,11 @@ def lookup(features):
             geocode, rpc = val
             result = json.loads(rpc.get_result().content)            
             if not geocode.results:
-                geocode.results = {'google-geocode-api': result}
+                geocode.results = result
             else:
-                geocode.results['google-geocode-api'] = result
+                geocode.results['results'].extend(result['results'])
             geocodes[feature] = geocode.results
+            geocode.has_google_results = True
             to_put.append(geocode)
     ndb.put_multi(to_put)
     return geocodes

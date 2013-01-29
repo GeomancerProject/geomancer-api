@@ -39,10 +39,11 @@ class Cache(polymodel.PolyModel):
 	def from_line(cls, source, line):
 		name, payload = line.split('\t')
 		geocode = cls.get_or_insert(name)
+		results = json.loads(payload)
 		if not geocode.results:
-			geocode.results = {source: json.loads(payload)}
+			geocode.results = dict(results=results)
 		else:
-			geocode.results[source] = json.loads(payload)
+			geocode.results['results'].extend(json.loads(payload)['results'])
 		return geocode
 
 	@classmethod

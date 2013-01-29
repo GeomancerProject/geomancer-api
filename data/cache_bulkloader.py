@@ -66,7 +66,7 @@ if __name__ == '__main__':
                       default=None)    
     parser.add_option("-b", "--batch-size", dest="batch",
                       help="Number of rows to PUT in single request.",
-                      default=None)        
+                      default=1000)        
     (options, args) = parser.parse_args()
     data = defaultdict(list)    
     logging.info("Processing %s into multimap of unique names to geocodes." % options.file)
@@ -79,7 +79,8 @@ if __name__ == '__main__':
     out = open(out_name, 'w')
     logging.info("Writing results to %s." % out_name)
     for name,geocodes in data.iteritems():
-    	out.write('%s\t%s\n' % (name, json.dumps(geocodes)))
+        results = reduce(lambda x,y: x + y['results'], geocodes, [])
+    	out.write('%s\t%s\n' % (name, json.dumps(results)))
     out.flush()
     out.close()
     bulkload(out_name, options.url, options.source, options.kind, 
