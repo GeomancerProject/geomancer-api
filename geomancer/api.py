@@ -31,7 +31,7 @@ def georef(creds, lang, name):
         return clause
     loctype, scores = predict.loctype(name, creds)
     parts = parse.parts(name, loctype)
-    if len(parts) == 0:
+    if not parts or len(parts) == 0:
         return None
     features = parts['features']
     if lang:        
@@ -96,14 +96,23 @@ class ApiHandler(webapp2.RequestHandler):
             result = json.dumps(loc.json)        
         self.response.out.write(result)
 
-class GeocodeHandler(webapp2.RequestHandler):
+class ComponentHandler(webapp2.RequestHandler):
     def get(self):
         self.post()
 
     def post(self): 
-        features = self.request.get('f').split(',')
+        q, component = map(self.request.get, ['q', 'c'])
+        if component == 'geocode':
+            results = geocode.lookup(q.split(','))
+        elif component == 'predict':
+            results = predict.loctype(q, get_creds())
+        elif component == 'parts':
+            name, loctype = q.split(',')
+            results = parse.parts(name, loctype)
+        elif component == 'clauses':
+            results = [core.clauses_from_locality(x) for x in q.split(',')]
         self.response.out.headers['Content-Type'] = 'application/json'
-        self.response.out.write(json.dumps(geocode.lookup(features)))
+        self.response.out.write(json.dumps(results))
 
 class BulkJob(ndb.Model):
     data = ndb.TextProperty(required=True)
@@ -187,7 +196,7 @@ class StubHandler(webapp2.RequestHandler):
 
 handler = webapp2.WSGIApplication([
     ('/api/georef', ApiHandler),
-    ('/api/geocode', GeocodeHandler),    
+    ('/api', ComponentHandler),    
     ('/api/georef/stub', StubHandler),
     ('/api/cache/bulk', CacheWorker),
     ('/api/georef/bulk', BulkApi),
