@@ -1,3 +1,4 @@
+import json
 from google.appengine.ext import ndb
 from google.appengine.ext.ndb import polymodel
 
@@ -14,6 +15,11 @@ class Cache(polymodel.PolyModel):
 	def get_or_insert(cls, name):	
 		id = '%s-%s' % (cls._class_name(), cls.normalize_name(name))
 		return super(Cache, cls).get_or_insert(id)
+
+	@classmethod
+	def from_line(cls, line):
+		name, payload = line.split('\t')
+		return cls(id=name, results=json.loads(payload))
 
 def _create_georef_csv(georef):
     "Return CSV representation from supplied Georef."
