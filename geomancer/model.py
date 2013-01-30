@@ -22,6 +22,7 @@ class Cache(polymodel.PolyModel):
 	"""A simple Cache moodel."""
 	results = ndb.JsonProperty()
 	normalized_name = ndb.ComputedProperty(lambda x: x.key.id())	
+	source = ndb.StringProperty()
 
 	@classmethod
 	def normalize_name(cls, name):
@@ -29,15 +30,25 @@ class Cache(polymodel.PolyModel):
 		return ' '.join(name.lower().strip().split())
 
 	@classmethod 
-	def get_or_insert(cls, name):
+	def get_or_insert(cls, name, source=None):
 		"""Get existing or create new model and return it."""
 		id = '%s-%s' % (cls._class_name(), cls.normalize_name(name))
-		return super(Cache, cls).get_or_insert(id)
+		return super(Cache, cls).get_or_insert(id, source=source)
 
 	@classmethod
-	def from_line(cls, line):
+	def from_line(cls, source, line):
 		name, payload = line.split('\t')
-		return cls(id=name, results=json.loads(payload))
+		geocode = cls.get_or_insert(name)
+		results = json.loads(payload)
+		if not geocode.results:
+			geocode.results = dict(results=results)
+		else:
+			geocode.results['results'].extend(json.loads(payload)['results'])
+		return geocode
+
+	@classmethod
+	def from_source(cls, source):
+		return cls.query(cls.source==source).iter()
 
 def _create_georef_csv(georef):
     """Return CSV representation for supplied Georef."""

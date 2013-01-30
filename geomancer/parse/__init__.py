@@ -11,5 +11,6 @@ def parts(name, loctype):
 	if parts.results:
 		return parts.results	
 	parts.results = core.parse_loc(name, loctype)
+	parts.source = 'geomancer-parse'
 	parts.put()
 	return parts.results
