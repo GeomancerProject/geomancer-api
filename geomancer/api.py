@@ -79,7 +79,7 @@ class ApiHandler(webapp2.RequestHandler):
 
     def get(self):
         creds = get_creds()
-        q, format, cdb, lang = map(self.request.get, ['q', 'f', 'cdb', 'l'])
+        q, format, cdb, lang, cb = map(self.request.get, ['q', 'f', 'cdb', 'l', 'cb'])
         loc = process_loc(creds, lang, q)
         if cdb:
             user, table, api_key = cdb.split(',')
@@ -93,7 +93,10 @@ class ApiHandler(webapp2.RequestHandler):
             result = util.dumps(loc)        
         else: 
             self.response.out.headers['Content-Type'] = 'application/json'
-            result = json.dumps(loc.json)        
+            result = json.dumps(loc.json)
+        if cb:
+            self.response.out.headers['Content-Type'] = 'application/javascript'
+            result = '%s(%s);' % (cb, result)            
         self.response.out.write(result)
 
 class ComponentHandler(webapp2.RequestHandler):
