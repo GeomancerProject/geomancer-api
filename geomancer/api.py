@@ -29,13 +29,8 @@ def georef(creds, lang, name):
     clause = Clause.get_or_insert(name)
     if clause.georefs:
         return clause
-    tokens = [x.strip() for x in name.split()]
-    if len(tokens) == 1:
-        loctype = 'f'
-        scores = None
-    else:
-        loctype, scores = predict.loctype(name, creds)
-    logging.info('LOCTYPE: lang: %s name: %s %s\n' % (lang, name, loctype) )
+    loctype, scores = predict.loctype(name, creds)
+    logging.info('LOCTYPE: lang: %s name: %s %s\nSCORES: %s\n' % (lang, name, loctype, scores) )
     parts = parse.parts(name, loctype)
     logging.info('PARTS: %s\n' % parts)
     if not parts or len(parts) == 0:
