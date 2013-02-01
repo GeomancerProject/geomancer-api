@@ -23,7 +23,9 @@ def loctype(name, creds, model='loctype'):
 		return loctype.results
 	tokens = [x.strip() for x in name.split()]
 	if len(tokens) == 1:
-		return ['f',{u'f': 0.9, u'p': 0.10}]
+		loctype.results = ['f',{u'f': 0.9, u'p': 0.10}]
+		loctype.put()
+		return loctype.results
 	payload = {"input": {"csvInstance": [name]}}
 	http = creds.authorize(httplib2.Http())
 	service = build('prediction', 'v1.5', http=http)
