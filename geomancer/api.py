@@ -35,7 +35,7 @@ def georef(creds, lang, name):
         return None
     features = parts['features']
     if lang:        
-        features_trans = translate.get(features, 'en', lang)
+        features_trans = map(partial(translate.get, 'en', lang), features)
         geocodes = geocode.lookup(map(normalize, features_trans))
     else:
         geocodes = geocode.lookup(map(normalize, features))
@@ -52,7 +52,7 @@ def georef(creds, lang, name):
 
 def process_loc(creds, lang, loc_name):
     if lang:
-        loc_name = translate.get(loc_name, lang, 'en')
+        loc_name = translate.get(lang, 'en', loc_name)
     loc = Locality.get_or_insert(loc_name)
     if not loc.georefs:            
         clause_names = core.clauses_from_locality(loc_name)
@@ -79,7 +79,7 @@ class ApiHandler(webapp2.RequestHandler):
 
     def get(self):
         creds = get_creds()
-        q, format, cdb, lang = map(self.request.get, ['q', 'f', 'cdb', 'l'])
+        q, format, cdb, lang, cb = map(self.request.get, ['q', 'f', 'cdb', 'l', 'cb'])
         loc = process_loc(creds, lang, q)
         if cdb:
             user, table, api_key = cdb.split(',')
@@ -93,7 +93,10 @@ class ApiHandler(webapp2.RequestHandler):
             result = util.dumps(loc)        
         else: 
             self.response.out.headers['Content-Type'] = 'application/json'
-            result = json.dumps(loc.json)        
+            result = json.dumps(loc.json)
+        if cb:
+            self.response.out.headers['Content-Type'] = 'application/javascript'
+            result = '%s(%s);' % (cb, result)            
         self.response.out.write(result)
 
 class ComponentHandler(webapp2.RequestHandler):
@@ -104,6 +107,9 @@ class ComponentHandler(webapp2.RequestHandler):
         q, component = map(self.request.get, ['q', 'c'])
         if component == 'geocode':
             results = geocode.lookup(q.split(','))
+        if component == 'translate':
+            source, target, q = q.split(',')
+            results = translate.get(source, target, q)
         elif component == 'predict':
             results = predict.loctype(q, get_creds())
         elif component == 'parts':
