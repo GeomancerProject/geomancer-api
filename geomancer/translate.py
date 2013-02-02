@@ -11,7 +11,8 @@ service = build('translate', 'v2', developerKey=key)
 class Translation(Cache):
 	pass
 
-def get(q, source, target):
+def get(source, target, q):
+	logging.info('Q %s' % q)
 	id = '-'.join([source, target, q])
 	translation = Translation.get_or_insert(id)
 	if translation.results:

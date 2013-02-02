@@ -39,3 +39,5 @@ client_secrets.json
 googlekey
 datastore
 translate_key
+deploy.sh
+run.sh
