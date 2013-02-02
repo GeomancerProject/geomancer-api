@@ -39,6 +39,7 @@ def georef(creds, lang, name):
     if lang:        
         features_trans = map(partial(translate.get, 'en', lang), features)
         geocodes = geocode.lookup(map(normalize, features_trans))
+        geocodes = apply(dict, [zip(features, geocodes.values())])
     else:
         geocodes = geocode.lookup(map(normalize, features))
     parts['feature_geocodes'] = geocodes
