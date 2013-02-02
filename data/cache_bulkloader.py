@@ -25,7 +25,7 @@ def bulkload(path, url, source, kind, batch=1000):
     """Bulkload file at supplied path to url endpoint."""
     logging.info('Bulkloading %s to %s (%s, %s)' % (path, url, source, kind))
     client = httplib2.Http()
-    retries = 5
+    retries = 10
     retry_count = 0
     backoff = 1
     for p in partition(open(out_name, 'r').read().splitlines(), batch):
@@ -83,5 +83,6 @@ if __name__ == '__main__':
     	out.write('%s\t%s\n' % (name, json.dumps(results)))
     out.flush()
     out.close()
-    bulkload(out_name, options.url, options.source, options.kind, 
-        batch=int(options.batch))
+    if options.url:
+        bulkload(out_name, options.url, options.source, options.kind, 
+            batch=int(options.batch))

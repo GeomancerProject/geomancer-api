@@ -36,15 +36,17 @@ class Cache(polymodel.PolyModel):
 		return super(Cache, cls).get_or_insert(id, source=source)
 
 	@classmethod
-	def from_line(cls, source, line):
-		name, payload = line.split('\t')
-		geocode = cls.get_or_insert(name)
-		results = json.loads(payload)
-		if not geocode.results:
-			geocode.results = dict(results=results)
-		else:
-			geocode.results['results'].extend(json.loads(payload)['results'])
-		return geocode
+	def from_line(cls, source, kind, line):
+		if kind == 'Geocode':
+			from geomancer.geocode import Geocode
+			name, payload = line.split('\t')
+			results = json.loads(payload)
+			item = Geocode.get_or_insert(name)
+			if not item.results:
+				item.results = dict(results=results)
+			else:
+				item.results['results'].extend(results)
+		return item
 
 	@classmethod
 	def from_source(cls, source):
