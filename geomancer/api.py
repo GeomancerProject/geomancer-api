@@ -30,9 +30,7 @@ def georef(creds, lang, name):
     if clause.georefs:
         return clause
     loctype, scores = predict.loctype(name, creds)
-#    logging.info('\nLOCTYPE: %s name: %s lang: %s\nSCORES: %s\n' % (loctype, name, lang, scores) )
     parts = parse.parts(name, loctype)
-#    logging.info('\nPARTS: \n%s' % parts)
     if not parts or len(parts) == 0:
         return None
     features = parts['features']
@@ -167,7 +165,7 @@ class CacheWorker(webapp2.RequestHandler):
     def post(self):
         data, source, kind = map(self.request.get, ['data', 'source', 'kind'])
         if kind == 'Geocode':
-            models = map(partial(Geocode.from_line, source), data.splitlines())
+            models = map(partial(Geocode.from_line, source, kind), data.splitlines())
         ndb.put_multi(models)
         self.response.out.status = 201
 
