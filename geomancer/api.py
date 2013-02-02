@@ -19,6 +19,9 @@ def normalize(name):
     "Return the normalized version of supplied name."
     return name.lower().strip()
 
+#parts['feature_geocodes'] = apply(dict, [zip(features, geocodes)])
+#logging.info('FEATURE GEOCODES %s' % parts['feature_geocodes'])
+
 def georef(creds, lang, name):
     """Return a georeferenced Clause model from supplied clause name. The Clause
     will be populated with name, normalized_name, interpreted_name, loctype, parts,
@@ -37,6 +40,7 @@ def georef(creds, lang, name):
     if lang:        
         features_trans = map(partial(translate.get, 'en', lang), features)
         geocodes = geocode.lookup(map(normalize, features_trans))
+        geocodes = apply(dict, [zip(features, geocodes.values())])
     else:
         geocodes = geocode.lookup(map(normalize, features))
     parts['feature_geocodes'] = geocodes
