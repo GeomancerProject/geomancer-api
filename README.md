@@ -43,7 +43,7 @@ The API accepts the following parameters. Values must be URL encoded.
   </tr>  
 </table>
 
-_* Your CartoDB table needs to exist with name, longitude, latitude, and uncertainty columns._
+_* Your CartoDB table needs to exist with name, longitude, latitude, and uncertainty columns. Don't forget to [georeference](http://developers.cartodb.com/tutorials/how_to_georeference.html#georeference) your longitude and latitude in CartoDB so they show up on the map!_
 
 # Examples
 
