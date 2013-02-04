@@ -107,13 +107,11 @@ class ApiHandler(webapp2.RequestHandler):
             self.response.out.headers['Content-Type'] = 'application/javascript'
             result = '%s(%s);' % (cb, result)  
         if cdb:
-            logging.info('------------------------HI')
             user, table, apikey = cdb.split(',')
             link = cartodb.save_results(loc.csv, user, table, apikey)
             result = loc.json
             loc.json['cartodb_link'] = link
             result = json.dumps(result)
-        logging.info('RESULTS %s' % result)
         self.response.out.write(result)
 
 class ComponentHandler(webapp2.RequestHandler):
