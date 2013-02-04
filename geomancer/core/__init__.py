@@ -130,6 +130,66 @@ def findNumbers(tokens):
         i += 1
     return numbers
 
+def findTRS(loc):
+    tokens = [x.strip() for x in loc.split()]
+    retokens = retokenize(tokens)
+    # Find the position of "township" token
+    tpos = first_substring_in_list(retokens, ['t', 'township'], 0, False)
+    if tpos == -1:
+        return None
+    # Find the position of the "range" token
+    rpos = first_substring_in_list(retokens, ['r','range'], 0, False)
+    if rpos == -1:
+        return None
+    # Township number begins after the township token
+    # Range number begins after the range token
+    tnum = retokens[tpos+1]
+    if get_number(tnum) is None:
+        return None
+    rnum = retokens[rpos+1]
+    if get_number(rnum) is None:
+        return None
+    
+    # Township heading begins after the township number
+    # Range heading begins after the range number
+    th = get_heading(retokens[tpos+2])
+    if th is None:
+        return None
+    theading = th.name
+    rh = get_heading(retokens[rpos+2])
+    if rh is None:
+        return None
+    rheading = rh.name
+    # Find the position of "section" token
+    snum = None
+    spositions = []
+    i = first_substring_in_list(retokens, ['s', 'sec', 'section'], 0, False)
+    while i>-1:
+        spositions.append(i)
+        i = first_substring_in_list(retokens, ['s', 'sec', 'section'], i+1, False)
+        # spositions is a list of all possible positions of section
+        # designators in the string. The real one, if any, should be followed
+        # by a number.
+    qpositions = []
+    subsections = []
+    for i in spositions :
+        if i<len(retokens) and is_number(retokens[i+1]):
+            snum = retokens[i+1]
+            #There is a section, so there might be subsections
+            i = first_substring_in_list(retokens, ['0.25', '0.5'], 0, False)
+            while i > -1:
+                qpositions.append(i)
+                i = first_substring_in_list(retokens, ['0.25', '0.5'], i+1, False)
+            # qpositions has a list of the positions of all the subsection 
+            # designators in the string
+            for qpos in qpositions:
+                ssheading = get_heading(retokens[qpos-1])
+                if ssheading is not None:
+                    subsections.append( (ssheading.name, retokens[qpos]) )
+
+    tr = 'T%s%s R%s%s' % (tnum, theading, rnum, rheading)
+    return [tr,snum, subsections]
+
 def findUnits(tokens):
     # Don't do anything to change tokens.
     # units: list of tuples of form
@@ -158,6 +218,25 @@ def first_substring(strings, substring):
             return i
         i+=1
     return -1 
+
+def first_substring_in_list(strings, substrings, startindex=0, matchcase=True):
+    findthese = []
+    amongthese=[]
+    if matchcase == True:
+        findthese = substrings
+        amongthese = strings
+    else:
+        for s in substrings:
+            findthese.append(s.lower())
+        for s in strings:
+            amongthese.append(s.lower())
+    for findme in findthese:
+        try:
+            found = amongthese.index(findme, startindex)
+            return found
+        except ValueError:
+            pass
+    return -1
 
 def foh_error(point, extent, offsetstr, offsetunits, headingstr):
     """ Returns the radius in meters from a Point containing all of the 
@@ -436,6 +515,18 @@ def get_georefs_from_parts(parts):
                     heading)
                 if georef is not None:
                     georefs.append(georef)
+    elif loc_type == 'trs' or loc_type == 'trss':
+        for geocode in feature_geocodes.values():
+            feature_georefs = get_maps_response_georefs(geocode)
+            for g in feature_georefs:
+                nw = Point(g['bounds']['southwest']['lng'], g['bounds']['northeast']['lat'])
+                se = Point(g['bounds']['northeast']['lng'], g['bounds']['southwest']['lat'])
+                bb = BoundingBox(nw, se)
+                section = parts['section']
+                subsection = parts['subsection']
+                georef = trs_georef(bb, section, subsection)
+                if georef is not None:
+                    georefs.append(georef)
     elif loc_type == 'foo':
         for geocode in feature_geocodes.values():
             feature_georefs = get_maps_response_georefs(geocode)
@@ -644,12 +735,16 @@ def parse_loc(loc, loctype):
     parts = {}
     if loctype.lower() == 'f' or loctype.lower() == 'nf':
         parts = parse_loc_f(loc,loctype)
-    if loctype.lower() == 'bf':
+    elif loctype.lower() == 'bf':
         parts = parse_loc_bf(loc,loctype)
-    if loctype.lower() == 'foh':
+    elif loctype.lower() == 'foh':
         parts = parse_loc_foh(loc,loctype)
-    if loctype.lower() == 'foo':
+    elif loctype.lower() == 'foo':
         parts = parse_loc_foo(loc,loctype)
+    elif loctype.lower() == 'trs':
+        parts = parse_loc_trs(loc,loctype)
+    elif loctype.lower() == 'trss':
+        parts = parse_loc_trs(loc,loctype)
     return parts
 
 def parse_loc_bf(loc, loctype):
@@ -775,6 +870,38 @@ def parse_loc_foo(loc,loctype):
         }                
     return parts
 
+def parse_loc_trs(loc, loctype):
+    if len(loc) < 2:
+        status = 'Not a valid between features locality'
+    features = findTRS(loc)
+    if features is None:
+        return None
+    status = 'complete'
+    if features[1] is None:
+        interpreted_loc = '%s' % (features[0])
+    else:
+        interpreted_loc = '%s Sec%s' % (features[0],features[1])
+        if len(features[2]) > 0:
+            i = 0
+            for f in features[2]:
+                if i==0:
+                    interpreted_loc = '%s %s%s' % (interpreted_loc, features[2][i][0], features[2][i][1])
+                else:
+                    interpreted_loc = '%s of %s%s' % (interpreted_loc, features[2][i][0], features[2][i][1])
+                i += 1
+            interpreted_loc = interpreted_loc.replace('0.25','1/4').replace('0.5','1/2')
+    parts = {
+        'verbatim_loc': loc,
+        'locality_type': loctype,
+        'features': [features[0].lower()],
+        'section': features[1],
+        'subsection': features[2],
+        'feature_geocodes': None,
+        'interpreted_loc': interpreted_loc,
+        'status': status
+        }                
+    return parts
+
 def pr_to_georef(center, radius):
     if center is None:
         return None
@@ -803,6 +930,7 @@ def retokenize(tokens):
     i = 0
     for token in tokens:
         test = separate_numbers_from_strings(token)
+        
         if len(newtokens) > 0 and is_number(newtokens[len(newtokens) - 1]) \
             and is_number(test[0]) and float(test[0]) < 1:
             hasfraction = i
@@ -875,13 +1003,86 @@ def separate_numbers_from_strings(token):
         nonnumstr = '%s%s' % (nonnumstr, token[i])
         i += 1
     numstr = right(token, len(token) - i)
+    if is_fraction(numstr):
+        newtokens.append(nonnumstr)
+        newtokens.append(get_fraction(numstr))
+        return newtokens
     if is_number(numstr):
         newtokens.append(nonnumstr)
         newtokens.append(numstr)
         return newtokens
     # There is a number somewhere in the middle of the token
-    newtokens.append(token)
+    # split on the number
+    numstr = ''
+    while i<len(token) and token[i].isdigit():
+        numstr = '%s%s' % (numstr, token[i])
+        i += 1
+    rest = ''
+    while i<len(token):
+        rest = '%s%s' % (rest, token[i])
+        i += 1 
+    newtokens.append(nonnumstr)
+    newtokens.append(numstr)
+    newtokens.append(rest)
     return newtokens
+
+def trs_georef(bb, section, subsection):
+    sec = int(section)
+    row = int((sec-1)/6)
+    if row%2 == 0:
+        column = sec - row*6 -1
+    else:
+        column = 6- (sec - row*6)
+    # This is an estimate based on standard sections
+    # xoffset is to the ne corner of the section
+    # from the NE corner of the township
+    # yoffset is to the ne corner of the section
+    # from the NE corner of the township
+    xoffset = 1138*column
+    yoffset = 1138*row
+    township_ne = Point(bb.se.lng, bb.nw.lat)
+    # The corners of the section...
+    section_ne = township_ne.get_point_on_rhumb_line(xoffset,270)
+    section_nw = section_ne.get_point_on_rhumb_line(1138,270)
+    section_sw = section_nw.get_point_on_rhumb_line(yoffset,180)
+    section_se = section_ne.get_point_on_rhumb_line(1138,180)
+    if len(subsection) == 0:
+        # No subsections, georef the section
+        section_bb = BoundingBox(section_nw, section_se)
+    else:
+        # Subsections. Process them in reverse order
+        depth = 2
+        ss_nw = section_nw
+        ss_se = section_se
+        i = len(subsection)-1
+        while i > -1:
+            if subsection[i][0].lower() == 'n':
+                ss_se = ss_se.get_point_on_rhumb_line(1138/depth,0)
+            elif subsection[i][0].lower() == 's':
+                ss_nw = ss_nw.get_point_on_rhumb_line(1138/depth,180)
+            elif subsection[i][0].lower() == 'e':
+                ss_nw = ss_nw.get_point_on_rhumb_line(1138/depth,90)
+            elif subsection[i][0].lower() == 'w':
+                ss_se = ss_se.get_point_on_rhumb_line(1138/depth,270)
+            elif subsection[i][0].lower() == 'ne':
+                ss_se = ss_se.get_point_on_rhumb_line(1138/depth,0)
+                ss_nw = ss_nw.get_point_on_rhumb_line(1138/depth,90)
+            elif subsection[i][0].lower() == 'nw':
+                ss_se = ss_se.get_point_on_rhumb_line(1138/depth,270)
+                ss_se = ss_se.get_point_on_rhumb_line(1138/depth,0)
+            elif subsection[i][0].lower() == 'se':
+                ss_nw = ss_nw.get_point_on_rhumb_line(1138/depth,90)
+                ss_nw = ss_nw.get_point_on_rhumb_line(1138/depth,180)
+            elif subsection[i][0].lower() == 'sw':
+                ss_se = ss_se.get_point_on_rhumb_line(1138/depth,270)
+                ss_nw = ss_nw.get_point_on_rhumb_line(1138/depth,180)
+            i -= 1
+            depth *= 2
+        section_nw = ss_nw
+        section_se = ss_se
+        section_bb = BoundingBox(section_nw, section_se)
+    georef = bb_to_georef(section_bb)
+    return georef
 
 def unitDictionary(tokens):
     units = {}
