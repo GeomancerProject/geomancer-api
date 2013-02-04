@@ -11,6 +11,7 @@ from geomancer.geocode import Geocode
 from google.appengine.api import mail
 from google.appengine.ext import ndb
 from google.appengine.api import taskqueue
+from google.appengine.api import users
 from google.appengine.ext.webapp.util import run_wsgi_app
 from oauth2client.appengine import CredentialsModel
 from oauth2client.appengine import StorageByKeyName
@@ -73,23 +74,30 @@ def get_creds():
         raise Exception('missing OAuth 2.0 credentials')
     return creds
 
+def validate_user(handler):
+    testers =  ['eightysteele', 'jdeck88', 'gtucobtuco']
+    user = users.get_current_user()
+    if not user or user.nickname() not in testers:
+        link = "<a href=\"%s\">login</a>." % users.create_login_url("/")
+        handler.response.out.write("<html><body>private beta: %s</body></html>" % link)
+        return False
+    return True
+
 class ApiHandler(webapp2.RequestHandler):
     
     def post(self):
         self.get()
 
     def get(self):
+        if not validate_user(self):
+            return
         creds = get_creds()
         q, format, cdb, lang, cb = map(self.request.get, ['q', 'f', 'cdb', 'l', 'cb'])
         loc = process_loc(creds, lang, q)
-        if cdb:
-            user, table, api_key = cdb.split(',')
-            cartodb.save_results(loc.csv, user, table, api_key)
-            return
         if format == 'csv':
             self.response.out.headers['Content-Type'] = 'text/csv'
             result = loc.csv
-        elif format == 'all':
+        elif format == 'verbose':
             self.response.out.headers['Content-Type'] = 'application/json'
             result = util.dumps(loc)        
         else: 
@@ -97,7 +105,15 @@ class ApiHandler(webapp2.RequestHandler):
             result = json.dumps(loc.json)
         if cb:
             self.response.out.headers['Content-Type'] = 'application/javascript'
-            result = '%s(%s);' % (cb, result)            
+            result = '%s(%s);' % (cb, result)  
+        if cdb:
+            logging.info('------------------------HI')
+            user, table, apikey = cdb.split(',')
+            link = cartodb.save_results(loc.csv, user, table, apikey)
+            result = loc.json
+            loc.json['cartodb_link'] = link
+            result = json.dumps(result)
+        logging.info('RESULTS %s' % result)
         self.response.out.write(result)
 
 class ComponentHandler(webapp2.RequestHandler):
@@ -105,6 +121,8 @@ class ComponentHandler(webapp2.RequestHandler):
         self.post()
 
     def post(self): 
+        if not validate_user(self):
+            return
         q, component = map(self.request.get, ['q', 'c'])
         if component == 'geocode':
             results = geocode.lookup(q.split(','))
@@ -144,6 +162,8 @@ class BulkApi(webapp2.RequestHandler):
 class BulkWorker(webapp2.RequestHandler):
     """Idempotent handler for notifying a person of an event."""
     def post(self): 
+        if not validate_user(self):
+            return
         job = ndb.Key(urlsafe=self.request.get('job')).get()
         creds = get_creds()
         if job.finished:
