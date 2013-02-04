@@ -3,6 +3,7 @@ import datetime
 import logging
 import json
 import webapp2
+import os
 from functools import partial
 from geomancer import translate
 from geomancer import predict, parse, geocode, util, core
@@ -75,10 +76,12 @@ def get_creds():
     return creds
 
 def validate_user(handler):
-    testers =  ['eightysteele', 'jdeck88', 'gtucobtuco']
+    path = '?'.join([os.environ['PATH_INFO'], os.environ['QUERY_STRING']])    
+    testers =  ['eightysteele', 'jdeck88', 'gtucobtuco', 'gtuco.btuco', 'dabblepop']
     user = users.get_current_user()
+    logging.info('USER %s' % user)    
     if not user or user.nickname() not in testers:
-        link = "<a href=\"%s\">login</a>." % users.create_login_url("/")
+        link = "<a href=\"%s\">login</a>." % users.create_login_url(path)
         handler.response.out.write("<html><body>private beta: %s</body></html>" % link)
         return False
     return True
