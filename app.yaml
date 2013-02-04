@@ -11,7 +11,7 @@ handlers:
 
 - url: /api.*
   script: geomancer.api.handler
-  
-- url: /admin/.*
+
+  - url: /admin/.*
   script: admin.handler
   login: admin
