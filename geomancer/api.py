@@ -77,7 +77,7 @@ def get_creds():
 
 def validate_user(handler):
     path = '?'.join([os.environ['PATH_INFO'], os.environ['QUERY_STRING']])    
-    testers =  ['eightysteele', 'jdeck88', 'gtucobtuco', 'gtuco.btuco', 'dabblepop']
+    testers =  ['eightysteele', 'jdeck88', 'gtucobtuco', 'gtuco.btuco', 'dabblepop', 'tommychristie']
     user = users.get_current_user()
     logging.info('USER %s' % user)    
     if not user or user.nickname() not in testers:
@@ -115,6 +115,7 @@ class ApiHandler(webapp2.RequestHandler):
             result = loc.json
             loc.json['cartodb_link'] = link
             result = json.dumps(result)
+        self.response.headers['charset'] = 'utf-8'
         self.response.out.write(result)
 
 class ComponentHandler(webapp2.RequestHandler):
