@@ -76,13 +76,10 @@ def get_creds():
     return creds
 
 def validate_user(handler):
-    path = '?'.join([os.environ['PATH_INFO'], os.environ['QUERY_STRING']])    
-    testers =  ['eightysteele', 'jdeck88', 'gtucobtuco', 'gtuco.btuco', 'dabblepop', 'tommychristie']
-    user = users.get_current_user()
-    logging.info('USER %s' % user)    
-    if not user or user.nickname() not in testers:
-        link = "<a href=\"%s\">login</a>." % users.create_login_url(path)
-        handler.response.out.write("<html><body>private beta: %s</body></html>" % link)
+    key = open(os.path.join(os.path.dirname(__file__), 'tester.key')).read()
+    if handler.request.get('k') != key:
+        handler.response.out.write('Private beta (contact @eightysteele for access)')
+        handler.response.set_status(405)
         return False
     return True
 
@@ -95,7 +92,7 @@ class ApiHandler(webapp2.RequestHandler):
         if not validate_user(self):
             return
         creds = get_creds()
-        q, format, cdb, lang, cb = map(self.request.get, ['q', 'f', 'cdb', 'l', 'cb'])
+        q, format, cdb, lang, cb = map(self.request.get, ['q', 'f', 'cdb', 'l', 'cb'])        
         loc = process_loc(creds, lang, q)
         if format == 'csv':
             self.response.out.headers['Content-Type'] = 'text/csv'
