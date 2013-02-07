@@ -78,7 +78,7 @@ def get_creds():
 def validate_user(handler):
     key = open(os.path.join(os.path.dirname(__file__), 'tester.key')).read()
     if handler.request.get('k') != key:
-        handler.response.out.write('Private beta (contact @eightysteele for access)')
+        handler.response.out.write('Private beta (contact @eightysteele or @tucotuco for access)')
         handler.response.set_status(405)
         return False
     return True
